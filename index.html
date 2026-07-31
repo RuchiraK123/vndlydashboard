@@ -402,10 +402,17 @@ function renderBurnRate(){
   const finalDeadline = WINDOWS[WINDOWS.length-1].end;
   const daysLeft = workingDaysUntil(finalDeadline);
 
-  const neededRate =
-      (remaining > 0 && daysLeft > 0)
-      ? remaining / daysLeft
-      : 0;
+let neededRate;
+
+if (remaining === 0) {
+  neededRate = 0;
+}
+else if (daysLeft <= 0) {
+  neededRate = remaining;
+}
+else {
+  neededRate = remaining / daysLeft;
+}
 
   document.getElementById('actualBurnRate').textContent =
       actualRate.toFixed(1);
@@ -463,6 +470,12 @@ function renderBurnRate(){
       status.style.color="#bbf7d0";
       status.innerHTML="🎉 Testing Complete";
   }
+  else if(daysLeft <= 0){
+    status.style.background="#7f1d1d";
+    status.style.color="#fecaca";
+    status.innerHTML=
+      `🚨 ${remaining} scenarios remain and the deadline has been reached`;
+}
   else if(actualRate >= neededRate){
       status.style.background="#14532d";
       status.style.color="#bbf7d0";
