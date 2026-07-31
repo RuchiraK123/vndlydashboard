@@ -88,7 +88,89 @@
         <div class="hint">"Needed/day" = remaining tests in that window ÷ working days left. Compare to your team's realistic daily throughput.</div>
       </div>
     </div>
+<!-- ================= BURN RATE ================= -->
 
+<div class="panel">
+  <h2>🔥 Burn Rate & Forecast</h2>
+
+  <div style="
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+      gap:10px;
+      margin-bottom:14px;
+  ">
+
+    <div style="background:#0b1120;border-radius:10px;padding:12px;">
+      <div class="muted" style="font-size:11px;">ACTUAL BURN RATE</div>
+      <div id="actualBurnRate" style="font-size:24px;font-weight:700;">0</div>
+      <div class="muted" style="font-size:12px;">completed/day</div>
+    </div>
+
+    <div style="background:#0b1120;border-radius:10px;padding:12px;">
+      <div class="muted" style="font-size:11px;">REQUIRED RATE</div>
+      <div id="neededBurnRate" style="font-size:24px;font-weight:700;">0</div>
+      <div class="muted" style="font-size:12px;">needed/day</div>
+    </div>
+
+    <div style="background:#0b1120;border-radius:10px;padding:12px;">
+      <div class="muted" style="font-size:11px;">COMPLETED</div>
+      <div id="burnDone" style="font-size:24px;font-weight:700;">0</div>
+      <div class="muted" style="font-size:12px;">scenarios</div>
+    </div>
+
+    <div style="background:#0b1120;border-radius:10px;padding:12px;">
+      <div class="muted" style="font-size:11px;">REMAINING</div>
+      <div id="burnRemaining" style="font-size:24px;font-weight:700;">0</div>
+      <div class="muted" style="font-size:12px;">scenarios</div>
+    </div>
+
+    <div style="background:#0b1120;border-radius:10px;padding:12px;">
+      <div class="muted" style="font-size:11px;">FORECAST FINISH</div>
+      <div id="forecastFinish" style="font-size:18px;font-weight:700;">—</div>
+      <div class="muted" style="font-size:12px;">based on current pace</div>
+    </div>
+
+  </div>
+
+  <div class="muted" style="font-size:12px;margin-bottom:6px;">
+    Actual Pace vs Pace Needed To Hit Deadline
+  </div>
+
+  <div style="
+     height:12px;
+     background:#0b1120;
+     border-radius:20px;
+     overflow:hidden;
+     margin-bottom:12px;
+  ">
+      <div id="burnRateBar"
+           style="
+             height:100%;
+             width:0%;
+             background:linear-gradient(90deg,#22c55e,#38bdf8);
+           ">
+      </div>
+  </div>
+
+  <div id="burnRateStatus"
+       style="
+         padding:12px;
+         border-radius:10px;
+         background:#14532d;
+         color:#bbf7d0;
+         font-size:13px;
+         font-weight:600;
+       ">
+       ✅ Waiting for data...
+  </div>
+
+  <div class="hint">
+    Burn Rate = completed scenarios ÷ elapsed working days.
+    Forecast automatically estimates finish date using your current velocity.
+  </div>
+</div>
+
+<!-- ================= END BURN RATE ================= -->
     <div class="panels">
       <div class="panel"><h2>Remaining Work by Tester</h2><div class="bars" id="testerBars"></div></div>
       <div class="panel"><h2>Remaining Work by Module</h2><div class="bars" id="moduleBars"></div></div>
