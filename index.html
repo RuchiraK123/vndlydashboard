@@ -399,8 +399,27 @@ function renderBurnRate(){
 
   const actualRate = done / elapsedDays;
 
-  const finalDeadline = WINDOWS[WINDOWS.length-1].end;
-  const daysLeft = workingDaysUntil(finalDeadline);
+  // Use the latest due date of unfinished tests instead of the hardcoded window
+
+const unfinished = rows.filter(r =>
+  !isDone(r.status) && r.end
+);
+
+let daysLeft = 0;
+
+if (unfinished.length > 0) {
+
+  const latestDue = unfinished.reduce((max, r) =>
+    new Date(r.end) > max
+      ? new Date(r.end)
+      : max,
+    new Date(unfinished[0].end)
+  );
+
+  daysLeft = workingDaysUntil(
+    latestDue.toISOString().slice(0,10)
+  ) || 0;
+}
 
 let neededRate;
 
@@ -418,7 +437,9 @@ else {
       actualRate.toFixed(1);
 
   document.getElementById('neededBurnRate').textContent =
-      neededRate.toFixed(1);
+    remaining > 0
+      ? Math.max(1, neededRate).toFixed(1)
+      : "0.0";
 
   document.getElementById('burnDone').textContent = done;
 
