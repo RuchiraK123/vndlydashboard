@@ -295,6 +295,7 @@ function renderAll(){
   renderCards();
   renderProgress();
   renderDeadlines();
+  renderBurnRate();
   renderBars('testerBars','tester');
   renderBars('moduleBars','module');
   renderFilters();
@@ -367,6 +368,113 @@ function renderDeadlines(){
       <div><b>${w.label}</b><br><span class="muted">Due ${w.end} • ${wd??'?'} working days left</span></div>
       <div>${pill}</div></div>`;
   }).join('');
+}
+function renderBurnRate(){
+
+  const total = rows.length;
+  const done = rows.filter(r => isDone(r.status)).length;
+  const remaining = total - done;
+
+  const startDates = rows
+      .map(r => r.start)
+      .filter(Boolean)
+      .map(d => new Date(d))
+      .filter(d => !isNaN(d));
+
+  const projectStart = startDates.length
+      ? new Date(Math.min(...startDates))
+      : today();
+
+  let elapsedDays = 0;
+  let d = new Date(projectStart);
+
+  while(d <= today()){
+      if(d.getDay() !== 0 && d.getDay() !== 6){
+          elapsedDays++;
+      }
+      d.setDate(d.getDate()+1);
+  }
+
+  elapsedDays = Math.max(1, elapsedDays);
+
+  const actualRate = done / elapsedDays;
+
+  const finalDeadline = WINDOWS[WINDOWS.length-1].end;
+  const daysLeft = workingDaysUntil(finalDeadline);
+
+  const neededRate =
+      (remaining > 0 && daysLeft > 0)
+      ? remaining / daysLeft
+      : 0;
+
+  document.getElementById('actualBurnRate').textContent =
+      actualRate.toFixed(1);
+
+  document.getElementById('neededBurnRate').textContent =
+      neededRate.toFixed(1);
+
+  document.getElementById('burnDone').textContent = done;
+
+  document.getElementById('burnRemaining').textContent =
+      remaining;
+
+  if(actualRate > 0 && remaining > 0){
+
+      const finishDays =
+          Math.ceil(remaining / actualRate);
+
+      let forecast = new Date();
+
+      let added = 0;
+
+      while(added < finishDays){
+          forecast.setDate(forecast.getDate()+1);
+
+          if(
+             forecast.getDay() !== 0 &&
+             forecast.getDay() !== 6
+          ){
+             added++;
+          }
+      }
+
+      document.getElementById('forecastFinish')
+        .textContent =
+        forecast.toISOString().slice(0,10);
+
+  } else {
+      document.getElementById('forecastFinish')
+        .textContent = "Complete";
+  }
+
+  const ratio = neededRate > 0
+      ? actualRate / neededRate
+      : 1;
+
+  document.getElementById('burnRateBar')
+      .style.width =
+      Math.min(100,ratio*100) + "%";
+
+  const status =
+      document.getElementById('burnRateStatus');
+
+  if(remaining === 0){
+      status.style.background="#14532d";
+      status.style.color="#bbf7d0";
+      status.innerHTML="🎉 Testing Complete";
+  }
+  else if(actualRate >= neededRate){
+      status.style.background="#14532d";
+      status.style.color="#bbf7d0";
+      status.innerHTML=
+      `✅ On Track | Current: ${actualRate.toFixed(1)}/day | Needed: ${neededRate.toFixed(1)}/day`;
+  }
+  else{
+      status.style.background="#7f1d1d";
+      status.style.color="#fecaca";
+      status.innerHTML=
+      `🚨 Behind Pace | Current: ${actualRate.toFixed(1)}/day | Needed: ${neededRate.toFixed(1)}/day`;
+  }
 }
 
 function renderBars(elId,key){
