@@ -91,7 +91,7 @@
       <div class="panel">
         <h2>⏱️ Deadline Pacing — Are We On Track?</h2>
         <div class="deadline-grid" id="deadlines"></div>
-        <div class="hint">"Needed/day" = remaining tests in that window ÷ business days left.</div>
+        <div class="hint">"Needed/day" = remaining tests ÷ business days left (Mon–Fri, includes today &amp; the deadline day).</div>
       </div>
     </div>
     <div class="panel">
@@ -163,18 +163,16 @@ function asOf(){
 }
 function today(){return asOf();}
 
-/* Parse a date from the filename. Handles your MMDDYY pattern (e.g. 073026),
-   plus common fallbacks. Returns "YYYY-MM-DD" or null. */
 function parseDateFromFilename(name){
   if(!name) return null;
   const base=name.replace(/\.[^.]+$/,'');
-  let m=base.match(/(?:^|[_\-\s])(\d{2})(\d{2})(\d{2})(?:[_\-\s]|$)/); // MMDDYY
+  let m=base.match(/(?:^|[_\-\s])(\d{2})(\d{2})(\d{2})(?:[_\-\s]|$)/);
   if(m){const mm=+m[1],dd=+m[2],yy=+m[3];if(mm>=1&&mm<=12&&dd>=1&&dd<=31){const yyyy=2000+yy;return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}}
-  m=base.match(/(20\d{2})[_\-](\d{1,2})[_\-](\d{1,2})/); // YYYY-MM-DD
+  m=base.match(/(20\d{2})[_\-](\d{1,2})[_\-](\d{1,2})/);
   if(m){const yyyy=+m[1],mm=+m[2],dd=+m[3];if(mm>=1&&mm<=12&&dd>=1&&dd<=31)return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
-  m=base.match(/(\d{1,2})[_\-](\d{1,2})[_\-](20\d{2})/); // MM-DD-YYYY
+  m=base.match(/(\d{1,2})[_\-](\d{1,2})[_\-](20\d{2})/);
   if(m){const mm=+m[1],dd=+m[2],yyyy=+m[3];if(mm>=1&&mm<=12&&dd>=1&&dd<=31)return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
-  m=base.match(/(?:^|[_\-\s])(\d{2})(\d{2})(20\d{2})(?:[_\-\s]|$)/); // MMDDYYYY
+  m=base.match(/(?:^|[_\-\s])(\d{2})(\d{2})(20\d{2})(?:[_\-\s]|$)/);
   if(m){const mm=+m[1],dd=+m[2],yyyy=+m[3];if(mm>=1&&mm<=12&&dd>=1&&dd<=31)return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
   return null;
 }
@@ -201,15 +199,12 @@ function handleFile(f){
     if(!parsed||!parsed.length){alert("Couldn't find a 'Test ID' column. Make sure this is the tracker download.");return;}
     rows=parsed;
     document.getElementById('dashboard').classList.remove('hidden');
-
-    // ---- AUTO-DETECT "AS OF" DATE FROM FILENAME (fallback: manual field) ----
     const asOfEl=document.getElementById('asOfDate');
     const detected=parseDateFromFilename(f.name);
     let sourceNote;
     if(detected){asOfEl.value=detected;sourceNote=`as-of date auto-read from filename → ${detected}`;}
     else if(asOfEl.value){sourceNote=`filename had no date — using date you entered (${asOfEl.value})`;}
     else{asOfEl.value=new Date().toISOString().slice(0,10);sourceNote=`⚠️ no date in filename — defaulted to today; please set the "Evaluate as of" date manually`;}
-
     document.getElementById('fileInfo').textContent=`Loaded: ${f.name} • ${rows.length} scenarios • ${sourceNote}`;
     renderAll();
   };
@@ -235,18 +230,16 @@ function fmtDate(val){
   if(typeof val==="number"){const d=new Date(Math.round((val-25569)*86400*1000));return d.toISOString().slice(0,10);}
   const s=String(val).trim();const d=new Date(s);return isNaN(d)? s : d.toISOString().slice(0,10);
 }
-/* ---- Business days from as-of date THROUGH the target date (both inclusive) ---- */
+function daysBetween(a,b){return Math.round((b-a)/(1000*60*60*24));}
+
+/* Business days from as-of date THROUGH target date (both inclusive). */
 function workingDaysUntil(dateStr){
   const end=new Date(new Date(dateStr).toDateString());
   const start=new Date(today().toDateString());
-  if(isNaN(end)) return null;
-  if(end<start) return 0;                    // deadline already passed
+  if(isNaN(end.getTime())) return null;
+  if(end<start) return 0;
   let count=0, d=new Date(start);
-  while(d<=end){
-    const wd=d.getDay();
-    if(wd!==0 && wd!==6) count++;            // count Mon–Fri, including today & deadline day
-    d.setDate(d.getDate()+1);
-  }
+  while(d<=end){const wd=d.getDay();if(wd!==0&&wd!==6)count++;d.setDate(d.getDate()+1);}
   return count;
 }
 
@@ -293,24 +286,20 @@ function renderDeadlines(){
   el.innerHTML=WINDOWS.map(w=>{
     const inWin=rows.filter(r=>r.end && new Date(r.end)<=new Date(w.end));
     const remaining=inWin.filter(r=>!isDone(r.status)).length;
-    const wd=workingDaysUntil(w.end);                 // business days incl. today & deadline
-    const daysLeft=daysBetween(today(),new Date(w.end)); // calendar days to deadline
-
+    const wd=workingDaysUntil(w.end);
+    const daysLeft=daysBetween(today(),new Date(w.end));
     let pill, subtext;
     if(remaining===0){
       pill=`<span class="pill ok">✅ Done</span>`;
       subtext=`Due ${w.end} — all scenarios in this window complete`;
-    }
-    else if(daysLeft<0){
+    } else if(daysLeft<0){
       pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d PAST DEADLINE • ${remaining} still left</span>`;
       subtext=`Was due ${w.end} • deadline missed`;
-    }
-    else {
-      const perDay = wd>0 ? Math.ceil(remaining/wd) : remaining;
+    } else {
       const perDayNum = wd>0 ? (remaining/wd) : remaining;
-      // urgency wording so a high number reads as "tight", not a glitch
+      const perDay = Math.ceil(perDayNum);
       let urgency="";
-      if(wd<=1)      urgency=" — last day, very tight";
+      if(wd<=1) urgency=" — last day, very tight";
       else if(perDayNum>4) urgency=" — high pace needed";
       const risk = perDayNum>3;
       const dayWord = wd===1 ? "1 business day left (today only)" : `${wd} business days left`;
@@ -324,30 +313,23 @@ function renderBurnRate(){
   const total=rows.length;
   const done=rows.filter(r=>isDone(r.status)).length;
   const remaining=total-done;
-
   const startDates=rows.map(r=>r.start).filter(Boolean).map(d=>new Date(d)).filter(d=>!isNaN(d));
   let projectStart = startDates.length ? new Date(Math.min(...startDates)) : new Date(today());
   projectStart = new Date(projectStart.toDateString());
-
-  let elapsedDays=0;
-  let d=new Date(projectStart);
+  let elapsedDays=0, d=new Date(projectStart);
   const asOfDay=new Date(today());
   while(d<=asOfDay){const wd=d.getDay();if(wd!==0&&wd!==6)elapsedDays++;d.setDate(d.getDate()+1);}
   elapsedDays=Math.max(1,elapsedDays);
-
   const actualRatePrecise=done/elapsedDays;
   const actualRateWhole=Math.round(actualRatePrecise);
-
   const finalDeadline=new Date(WINDOWS[WINDOWS.length-1].end);
   const workingDaysToDeadline=workingDaysUntil(WINDOWS[WINDOWS.length-1].end)||0;
   const daysPastDeadline=daysBetween(finalDeadline,asOfDay);
-
   let neededRate;
   if(remaining===0){neededRate=0;}
   else if(workingDaysToDeadline<=0){neededRate=null;}
   else{neededRate=remaining/workingDaysToDeadline;}
-
-  let forecastText="—";let forecastDate=null;
+  let forecastText="—", forecastDate=null;
   if(remaining===0){forecastText="✅ Complete";}
   else if(actualRatePrecise<=0){forecastText="⛔ Stalled (0/day)";}
   else{
@@ -356,13 +338,11 @@ function renderBurnRate(){
     while(added<finishDays){forecastDate.setDate(forecastDate.getDate()+1);if(forecastDate.getDay()!==0&&forecastDate.getDay()!==6)added++;}
     forecastText=forecastDate.toISOString().slice(0,10);
   }
-
   document.getElementById('actualBurnRate').textContent=actualRateWhole;
   document.getElementById('neededBurnRate').textContent=remaining===0?"0":(neededRate===null?"—":Math.ceil(neededRate));
   document.getElementById('burnDone').textContent=done;
   document.getElementById('burnRemaining').textContent=remaining;
   document.getElementById('forecastFinish').textContent=forecastText;
-
   const reqNote=document.getElementById('neededRateNote');
   if(reqNote){
     if(remaining===0){reqNote.textContent="all done";reqNote.style.color="#22c55e";}
@@ -370,18 +350,15 @@ function renderBurnRate(){
     else if(actualRatePrecise>=neededRate){reqNote.textContent="✅ on/ahead of pace";reqNote.style.color="#22c55e";}
     else{const gap=Math.ceil(neededRate-actualRatePrecise);reqNote.textContent=`⚠️ need +${gap}/day faster`;reqNote.style.color="#fbbf24";}
   }
-
   let ratio;
   if(remaining===0)ratio=1;
   else if(neededRate===null||neededRate===0)ratio=actualRatePrecise>0?1:0;
   else ratio=actualRatePrecise/neededRate;
   document.getElementById('burnRateBar').style.width=Math.min(100,Math.max(0,ratio*100))+"%";
-
   const status=document.getElementById('burnRateStatus');
   const green=()=>{status.style.background="#14532d";status.style.color="#bbf7d0";};
   const red=()=>{status.style.background="#7f1d1d";status.style.color="#fecaca";};
   const amber=()=>{status.style.background="#78350f";status.style.color="#fed7aa";};
-
   if(remaining===0){green();status.innerHTML="🎉 Testing Complete";}
   else if(daysPastDeadline>0){
     red();
