@@ -235,11 +235,18 @@ function fmtDate(val){
   if(typeof val==="number"){const d=new Date(Math.round((val-25569)*86400*1000));return d.toISOString().slice(0,10);}
   const s=String(val).trim();const d=new Date(s);return isNaN(d)? s : d.toISOString().slice(0,10);
 }
-function daysBetween(a,b){return Math.round((b-a)/(1000*60*60*24));}
+/* ---- Business days from as-of date THROUGH the target date (both inclusive) ---- */
 function workingDaysUntil(dateStr){
-  const end=new Date(dateStr); if(isNaN(end)) return null;
-  let d=new Date(today()), count=0;
-  while(d<=end){const wd=d.getDay(); if(wd!==0&&wd!==6) count++; d=new Date(d.getTime()+86400000);}
+  const end=new Date(new Date(dateStr).toDateString());
+  const start=new Date(today().toDateString());
+  if(isNaN(end)) return null;
+  if(end<start) return 0;                    // deadline already passed
+  let count=0, d=new Date(start);
+  while(d<=end){
+    const wd=d.getDay();
+    if(wd!==0 && wd!==6) count++;            // count Mon–Fri, including today & deadline day
+    d.setDate(d.getDate()+1);
+  }
   return count;
 }
 
@@ -286,12 +293,30 @@ function renderDeadlines(){
   el.innerHTML=WINDOWS.map(w=>{
     const inWin=rows.filter(r=>r.end && new Date(r.end)<=new Date(w.end));
     const remaining=inWin.filter(r=>!isDone(r.status)).length;
-    const wd=workingDaysUntil(w.end);
-    const daysLeft=daysBetween(today(),new Date(w.end));
+    const wd=workingDaysUntil(w.end);                 // business days incl. today & deadline
+    const daysLeft=daysBetween(today(),new Date(w.end)); // calendar days to deadline
+
     let pill, subtext;
-    if(remaining===0){pill=`<span class="pill ok">✅ Done</span>`;subtext=`Due ${w.end}`;}
-    else if(daysLeft<0){pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d PAST DEADLINE • ${remaining} still left</span>`;subtext=`Was due ${w.end} • deadline missed`;}
-    else{const perDay=wd>0?Math.ceil(remaining/wd):remaining;const risk=wd>0&&(remaining/wd)>3;pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ${perDay}/day needed</span>`;subtext=`Due ${w.end} • ${wd} business days left`;}
+    if(remaining===0){
+      pill=`<span class="pill ok">✅ Done</span>`;
+      subtext=`Due ${w.end} — all scenarios in this window complete`;
+    }
+    else if(daysLeft<0){
+      pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d PAST DEADLINE • ${remaining} still left</span>`;
+      subtext=`Was due ${w.end} • deadline missed`;
+    }
+    else {
+      const perDay = wd>0 ? Math.ceil(remaining/wd) : remaining;
+      const perDayNum = wd>0 ? (remaining/wd) : remaining;
+      // urgency wording so a high number reads as "tight", not a glitch
+      let urgency="";
+      if(wd<=1)      urgency=" — last day, very tight";
+      else if(perDayNum>4) urgency=" — high pace needed";
+      const risk = perDayNum>3;
+      const dayWord = wd===1 ? "1 business day left (today only)" : `${wd} business days left`;
+      pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ~${perDay}/day needed${urgency}</span>`;
+      subtext=`Due ${w.end} • ${dayWord}`;
+    }
     return `<div class="deadline-row"><div><b>${w.label}</b><br><span class="muted">${subtext}</span></div><div>${pill}</div></div>`;
   }).join('');
 }
