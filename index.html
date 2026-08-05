@@ -78,7 +78,7 @@
     <div class="asof">
       <label for="asOfDate">📅 Evaluate as of:</label>
       <input type="date" id="asOfDate">
-      <span class="note">Defaults to today. Set this to match the date of your tracker snapshot so pacing & forecast are accurate.</span>
+      <span class="note">Auto-read from the file's name (e.g. <b>073026</b> → Jul 30, 2026). If the name has no date, type it here manually. You can always override.</span>
     </div>
     <div class="cards" id="cards"></div>
     <div class="panels">
@@ -109,7 +109,7 @@
       <div class="hint" style="line-height:1.6;">
         <b>Actual Burn Rate</b> = Completed ÷ elapsed <b>business days</b> (Mon–Fri, weekends excluded), rounded to a whole number.<br>
         <b>Required Rate</b> = Remaining ÷ business days left until deadline — recalculates daily (rises if behind, falls if ahead).<br>
-        <b>Forecast Finish</b> = "Evaluate as of" date + (Remaining ÷ Actual Burn Rate) <b>business days</b>, skipping weekends.
+        <b>Forecast Finish</b> = "Evaluate as of" date (auto-read from filename) + (Remaining ÷ Actual Burn Rate) <b>business days</b>, skipping weekends.
       </div>
     </div>
     <div class="panels">
@@ -155,14 +155,29 @@ const WINDOWS = [
 let rows=[];
 let sortKey=null, sortDir=1;
 
-/* ================= "AS OF" DATE (fixes the past-deadline bug) ================= */
-// Everything is calculated relative to this date, NOT the computer clock.
+/* ================= "AS OF" DATE ================= */
 function asOf(){
   const el=document.getElementById('asOfDate');
   if(el && el.value){return new Date(el.value+"T00:00:00");}
   return new Date(new Date().toDateString());
 }
-function today(){return asOf();}   // all logic now uses the "as of" date
+function today(){return asOf();}
+
+/* Parse a date from the filename. Handles your MMDDYY pattern (e.g. 073026),
+   plus common fallbacks. Returns "YYYY-MM-DD" or null. */
+function parseDateFromFilename(name){
+  if(!name) return null;
+  const base=name.replace(/\.[^.]+$/,'');
+  let m=base.match(/(?:^|[_\-\s])(\d{2})(\d{2})(\d{2})(?:[_\-\s]|$)/); // MMDDYY
+  if(m){const mm=+m[1],dd=+m[2],yy=+m[3];if(mm>=1&&mm<=12&&dd>=1&&dd<=31){const yyyy=2000+yy;return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}}
+  m=base.match(/(20\d{2})[_\-](\d{1,2})[_\-](\d{1,2})/); // YYYY-MM-DD
+  if(m){const yyyy=+m[1],mm=+m[2],dd=+m[3];if(mm>=1&&mm<=12&&dd>=1&&dd<=31)return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
+  m=base.match(/(\d{1,2})[_\-](\d{1,2})[_\-](20\d{2})/); // MM-DD-YYYY
+  if(m){const mm=+m[1],dd=+m[2],yyyy=+m[3];if(mm>=1&&mm<=12&&dd>=1&&dd<=31)return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
+  m=base.match(/(?:^|[_\-\s])(\d{2})(\d{2})(20\d{2})(?:[_\-\s]|$)/); // MMDDYYYY
+  if(m){const mm=+m[1],dd=+m[2],yyyy=+m[3];if(mm>=1&&mm<=12&&dd>=1&&dd<=31)return `${yyyy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}
+  return null;
+}
 
 /* ================= FILE LOADING ================= */
 const drop=document.getElementById('drop'), fileInput=document.getElementById('file');
@@ -186,10 +201,16 @@ function handleFile(f){
     if(!parsed||!parsed.length){alert("Couldn't find a 'Test ID' column. Make sure this is the tracker download.");return;}
     rows=parsed;
     document.getElementById('dashboard').classList.remove('hidden');
-    // default the as-of date to today (only if not already set)
+
+    // ---- AUTO-DETECT "AS OF" DATE FROM FILENAME (fallback: manual field) ----
     const asOfEl=document.getElementById('asOfDate');
-    if(asOfEl && !asOfEl.value){asOfEl.value=new Date().toISOString().slice(0,10);}
-    document.getElementById('fileInfo').textContent=`Loaded: ${f.name} • ${rows.length} scenarios • ${new Date().toLocaleString()}`;
+    const detected=parseDateFromFilename(f.name);
+    let sourceNote;
+    if(detected){asOfEl.value=detected;sourceNote=`as-of date auto-read from filename → ${detected}`;}
+    else if(asOfEl.value){sourceNote=`filename had no date — using date you entered (${asOfEl.value})`;}
+    else{asOfEl.value=new Date().toISOString().slice(0,10);sourceNote=`⚠️ no date in filename — defaulted to today; please set the "Evaluate as of" date manually`;}
+
+    document.getElementById('fileInfo').textContent=`Loaded: ${f.name} • ${rows.length} scenarios • ${sourceNote}`;
     renderAll();
   };
   reader.readAsArrayBuffer(f);
@@ -278,34 +299,45 @@ function renderBurnRate(){
   const total=rows.length;
   const done=rows.filter(r=>isDone(r.status)).length;
   const remaining=total-done;
+
   const startDates=rows.map(r=>r.start).filter(Boolean).map(d=>new Date(d)).filter(d=>!isNaN(d));
-  const projectStart=startDates.length?new Date(Math.min(...startDates)):today();
-  let elapsedDays=0;let d=new Date(projectStart);
-  while(d<=today()){if(d.getDay()!==0&&d.getDay()!==6)elapsedDays++;d.setDate(d.getDate()+1);}
+  let projectStart = startDates.length ? new Date(Math.min(...startDates)) : new Date(today());
+  projectStart = new Date(projectStart.toDateString());
+
+  let elapsedDays=0;
+  let d=new Date(projectStart);
+  const asOfDay=new Date(today());
+  while(d<=asOfDay){const wd=d.getDay();if(wd!==0&&wd!==6)elapsedDays++;d.setDate(d.getDate()+1);}
   elapsedDays=Math.max(1,elapsedDays);
+
   const actualRatePrecise=done/elapsedDays;
   const actualRateWhole=Math.round(actualRatePrecise);
+
   const finalDeadline=new Date(WINDOWS[WINDOWS.length-1].end);
   const workingDaysToDeadline=workingDaysUntil(WINDOWS[WINDOWS.length-1].end)||0;
-  const daysPastDeadline=daysBetween(finalDeadline,today());
+  const daysPastDeadline=daysBetween(finalDeadline,asOfDay);
+
   let neededRate;
   if(remaining===0){neededRate=0;}
   else if(workingDaysToDeadline<=0){neededRate=null;}
   else{neededRate=remaining/workingDaysToDeadline;}
+
   let forecastText="—";let forecastDate=null;
   if(remaining===0){forecastText="✅ Complete";}
   else if(actualRatePrecise<=0){forecastText="⛔ Stalled (0/day)";}
   else{
     const finishDays=Math.ceil(remaining/actualRatePrecise);
-    forecastDate=new Date(today());let added=0;
+    forecastDate=new Date(asOfDay);let added=0;
     while(added<finishDays){forecastDate.setDate(forecastDate.getDate()+1);if(forecastDate.getDay()!==0&&forecastDate.getDay()!==6)added++;}
     forecastText=forecastDate.toISOString().slice(0,10);
   }
+
   document.getElementById('actualBurnRate').textContent=actualRateWhole;
   document.getElementById('neededBurnRate').textContent=remaining===0?"0":(neededRate===null?"—":Math.ceil(neededRate));
   document.getElementById('burnDone').textContent=done;
   document.getElementById('burnRemaining').textContent=remaining;
   document.getElementById('forecastFinish').textContent=forecastText;
+
   const reqNote=document.getElementById('neededRateNote');
   if(reqNote){
     if(remaining===0){reqNote.textContent="all done";reqNote.style.color="#22c55e";}
@@ -313,23 +345,26 @@ function renderBurnRate(){
     else if(actualRatePrecise>=neededRate){reqNote.textContent="✅ on/ahead of pace";reqNote.style.color="#22c55e";}
     else{const gap=Math.ceil(neededRate-actualRatePrecise);reqNote.textContent=`⚠️ need +${gap}/day faster`;reqNote.style.color="#fbbf24";}
   }
+
   let ratio;
   if(remaining===0)ratio=1;
   else if(neededRate===null||neededRate===0)ratio=actualRatePrecise>0?1:0;
   else ratio=actualRatePrecise/neededRate;
   document.getElementById('burnRateBar').style.width=Math.min(100,Math.max(0,ratio*100))+"%";
+
   const status=document.getElementById('burnRateStatus');
   const green=()=>{status.style.background="#14532d";status.style.color="#bbf7d0";};
   const red=()=>{status.style.background="#7f1d1d";status.style.color="#fecaca";};
   const amber=()=>{status.style.background="#78350f";status.style.color="#fed7aa";};
+
   if(remaining===0){green();status.innerHTML="🎉 Testing Complete";}
   else if(daysPastDeadline>0){
     red();
-    if(actualRatePrecise<=0){status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day — no forecast until testing resumes`;}
+    if(actualRatePrecise<=0){status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day`;}
     else{const lateDays=daysBetween(finalDeadline,forecastDate);status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline • ${remaining} left • at ~${actualRateWhole}/day, forecast finish ${forecastText} (~${lateDays} days late)`;}
   }
-  else if(actualRatePrecise>=neededRate){green();status.innerHTML=`✅ On Track • Current ~${actualRateWhole}/day ≥ Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}`;}
-  else{amber();const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;const lateNote=(lateDays!==null&&lateDays>0)?` (~${lateDays} days late)`:"";status.innerHTML=`⚠️ Behind Pace • Current ~${actualRateWhole}/day < Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}${lateNote}`;}
+  else if(actualRatePrecise>=neededRate){green();status.innerHTML=`✅ On Track • ~${actualRateWhole}/day ≥ Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}`;}
+  else{amber();const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;const lateNote=(lateDays!==null&&lateDays>0)?` (~${lateDays} days late)`:"";status.innerHTML=`⚠️ Behind Pace • ~${actualRateWhole}/day < Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}${lateNote}`;}
 }
 function renderBars(elId,key){
   const grp={};
