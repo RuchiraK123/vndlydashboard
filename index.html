@@ -63,7 +63,6 @@
   <h1>🧪 VNDLY Testing Burndown & Deadline Dashboard</h1>
   <p>Drop in your daily tracker download → instantly see what's left and whether you're on pace to finish on time.</p>
 </header>
-
 <div class="wrap">
   <div class="drop" id="drop">
     <div style="font-size:34px">📄⬇️</div>
@@ -71,10 +70,8 @@
     <small>Accepts the Extended_VNDLY_Test_Scenarios .xlsx download. Nothing is uploaded — it's read locally in your browser.</small>
     <input type="file" id="file" accept=".xlsx,.xls,.csv" class="hidden">
   </div>
-
   <div id="dashboard" class="hidden">
     <div class="cards" id="cards"></div>
-
     <div class="panels">
       <div class="panel">
         <h2>Overall Progress</h2>
@@ -85,104 +82,34 @@
       <div class="panel">
         <h2>⏱️ Deadline Pacing — Are We On Track?</h2>
         <div class="deadline-grid" id="deadlines"></div>
-        <div class="hint">"Needed/day" = remaining tests in that window ÷ working days left. Compare to your team's realistic daily throughput.</div>
+        <div class="hint">"Needed/day" = remaining tests in that window ÷ working days left.</div>
       </div>
     </div>
-<!-- ================= BURN RATE ================= -->
-
-<div class="panel">
-  <h2>🔥 Burn Rate & Forecast</h2>
-
-  <div style="
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
-      gap:10px;
-      margin-bottom:14px;
-  ">
-
-    <div style="background:#0b1120;border-radius:10px;padding:12px;">
-      <div class="muted" style="font-size:11px;">ACTUAL BURN RATE</div>
-      <div id="actualBurnRate" style="font-size:24px;font-weight:700;">0</div>
-      <div class="muted" style="font-size:12px;">completed/day</div>
-    </div>
-
-    <div style="background:#0b1120;border-radius:10px;padding:12px;">
-      <div class="muted" style="font-size:11px;">REQUIRED RATE</div>
-      <div id="neededBurnRate" style="font-size:24px;font-weight:700;">0</div>
-      <div class="muted" style="font-size:12px;">needed/day</div>
-    </div>
-
-    <div style="background:#0b1120;border-radius:10px;padding:12px;">
-      <div class="muted" style="font-size:11px;">COMPLETED</div>
-      <div id="burnDone" style="font-size:24px;font-weight:700;">0</div>
-      <div class="muted" style="font-size:12px;">scenarios</div>
-    </div>
-
-    <div style="background:#0b1120;border-radius:10px;padding:12px;">
-      <div class="muted" style="font-size:11px;">REMAINING</div>
-      <div id="burnRemaining" style="font-size:24px;font-weight:700;">0</div>
-      <div class="muted" style="font-size:12px;">scenarios</div>
-    </div>
-
-    <div style="background:#0b1120;border-radius:10px;padding:12px;">
-      <div class="muted" style="font-size:11px;">FORECAST FINISH</div>
-      <div id="forecastFinish" style="font-size:18px;font-weight:700;">—</div>
-      <div class="muted" style="font-size:12px;">based on current pace</div>
-    </div>
-
-  </div>
-
-  <div class="muted" style="font-size:12px;margin-bottom:6px;">
-    Actual Pace vs Pace Needed To Hit Deadline
-  </div>
-
-  <div style="
-     height:12px;
-     background:#0b1120;
-     border-radius:20px;
-     overflow:hidden;
-     margin-bottom:12px;
-  ">
-      <div id="burnRateBar"
-           style="
-             height:100%;
-             width:0%;
-             background:linear-gradient(90deg,#22c55e,#38bdf8);
-           ">
+    <div class="panel">
+      <h2>🔥 Burn Rate & Forecast</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px;">
+        <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">ACTUAL BURN RATE</div><div id="actualBurnRate" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">completed/day</div></div>
+        <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">REQUIRED RATE</div><div id="neededBurnRate" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">needed/day</div></div>
+        <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">COMPLETED</div><div id="burnDone" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">scenarios</div></div>
+        <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">REMAINING</div><div id="burnRemaining" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">scenarios</div></div>
+        <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">FORECAST FINISH</div><div id="forecastFinish" style="font-size:18px;font-weight:700;">—</div><div class="muted" style="font-size:12px;">based on current pace</div></div>
       </div>
-  </div>
-
-  <div id="burnRateStatus"
-       style="
-         padding:12px;
-         border-radius:10px;
-         background:#14532d;
-         color:#bbf7d0;
-         font-size:13px;
-         font-weight:600;
-       ">
-       ✅ Waiting for data...
-  </div>
-
-  <div class="hint">
-    Burn Rate = completed scenarios ÷ elapsed working days.
-    Forecast automatically estimates finish date using your current velocity.
-  </div>
-</div>
-
-<!-- ================= END BURN RATE ================= -->
+      <div class="muted" style="font-size:12px;margin-bottom:6px;">Actual Pace vs Pace Needed To Hit Deadline</div>
+      <div style="height:12px;background:#0b1120;border-radius:20px;overflow:hidden;margin-bottom:12px;"><div id="burnRateBar" style="height:100%;width:0%;background:linear-gradient(90deg,#22c55e,#38bdf8);"></div></div>
+      <div id="burnRateStatus" style="padding:12px;border-radius:10px;background:#14532d;color:#bbf7d0;font-size:13px;font-weight:600;">✅ Waiting for data...</div>
+      <div class="hint">Burn Rate = completed scenarios ÷ elapsed working days. Forecast estimates finish date using current velocity.</div>
+    </div>
     <div class="panels">
       <div class="panel"><h2>Remaining Work by Tester</h2><div class="bars" id="testerBars"></div></div>
       <div class="panel"><h2>Remaining Work by Module</h2><div class="bars" id="moduleBars"></div></div>
     </div>
-
     <div class="panel">
       <h2>🚧 What's Left To Do</h2>
       <div class="toolbar">
         <input type="text" id="search" placeholder="🔍 Search...">
         <select id="filterTester"><option value="">All Testers</option></select>
         <select id="filterModule"><option value="">All Modules</option></select>
-	<select id="filterStatus"><option value="">All Statuses</option></select>
+        <select id="filterStatus"><option value="">All Statuses</option></select>
         <label style="font-size:13px" class="muted"><input type="checkbox" id="onlyOpen"> Show only unfinished</label>
         <button class="btn-ghost" onclick="exportRemaining()">⬇ Export "What's Left" CSV</button>
       </div>
@@ -199,18 +126,13 @@
     <div class="hint" id="fileInfo"></div>
   </div>
 </div>
-
 <script>
 /* ================= CONFIG ================= */
 const DONE_STATUSES = ["passed","closed","complete","completed","pass"];
-const STATUS_COLORS = {
-  "Not Started":"#64748b","In Progress":"#f59e0b","Passed":"#22c55e",
-  "Defect":"#ef4444","Fail":"#ef4444","Ready for Retest":"#a855f7","Cancelled":"#475569","Blocked":"#ef4444"
-};
+const STATUS_COLORS = {"Not Started":"#64748b","In Progress":"#f59e0b","Passed":"#22c55e","Defect":"#ef4444","Fail":"#ef4444","Ready for Retest":"#a855f7","Cancelled":"#475569","Blocked":"#ef4444"};
 function colorFor(s){return STATUS_COLORS[s] || "#94a3b8";}
 function isDone(s){return DONE_STATUSES.includes((s||"").toLowerCase().trim());}
 
-/* Deadline windows from the tracker's weekly plan. Edit if dates change. */
 const WINDOWS = [
   {label:"Week 1 – Creation & Mods", end:"2026-07-24"},
   {label:"Week 2 – Invoices & WO Ends", end:"2026-07-31"},
@@ -247,39 +169,25 @@ function handleFile(f){
   };
   reader.readAsArrayBuffer(f);
 }
-
 function extract(arr,hdrIdx){
   const H=arr[hdrIdx].map(c=>String(c).trim().toLowerCase());
   const col=name=>H.findIndex(h=>h===name);
-  const ci={
-    id:col("test id"), module:col("module"), scenario:col("test scenario"),
-    tester:col("tester"), start:col("planned start date"), end:col("planned end date"),
-    status:col("test case status")
-  };
+  const ci={id:col("test id"),module:col("module"),scenario:col("test scenario"),tester:col("tester"),start:col("planned start date"),end:col("planned end date"),status:col("test case status")};
   if(ci.status<0) ci.status=H.findIndex(h=>h.includes("status"));
   if(ci.scenario<0) ci.scenario=H.findIndex(h=>h.includes("scenario"));
   const out=[];
   for(let i=hdrIdx+1;i<arr.length;i++){
     const r=arr[i]; const id=String(r[ci.id]||"").trim();
     if(!id) continue;
-    out.push({
-      id, module:v(r,ci.module), scenario:v(r,ci.scenario), tester:v(r,ci.tester)||"(unassigned)",
-      start:fmtDate(r[ci.start]), end:fmtDate(r[ci.end]), status:v(r,ci.status)||"Not Started"
-    });
+    out.push({id,module:v(r,ci.module),scenario:v(r,ci.scenario),tester:v(r,ci.tester)||"(unassigned)",start:fmtDate(r[ci.start]),end:fmtDate(r[ci.end]),status:v(r,ci.status)||"Not Started"});
   }
   return out;
 }
 function v(r,i){return i>=0 ? String(r[i]||"").trim() : "";}
-
 function fmtDate(val){
   if(val===""||val==null) return "";
-  if(typeof val==="number"){ // Excel serial date
-    const d=new Date(Math.round((val-25569)*86400*1000));
-    return d.toISOString().slice(0,10);
-  }
-  const s=String(val).trim();
-  const d=new Date(s);
-  return isNaN(d)? s : d.toISOString().slice(0,10);
+  if(typeof val==="number"){const d=new Date(Math.round((val-25569)*86400*1000));return d.toISOString().slice(0,10);}
+  const s=String(val).trim();const d=new Date(s);return isNaN(d)? s : d.toISOString().slice(0,10);
 }
 function today(){return new Date(new Date().toDateString());}
 function daysBetween(a,b){return Math.round((b-a)/(1000*60*60*24));}
@@ -291,22 +199,8 @@ function workingDaysUntil(dateStr){
 }
 
 /* ================= RENDER ================= */
-function renderAll(){
-  renderCards();
-  renderProgress();
-  renderDeadlines();
-  renderBurnRate();
-  renderBars('testerBars','tester');
-  renderBars('moduleBars','module');
-  renderFilters();
-  renderTable();
-}
-
-function statusCounts(list=rows){
-  const c={};
-  list.forEach(r=>{const s=normStatus(r.status);c[s]=(c[s]||0)+1;});
-  return c;
-}
+function renderAll(){renderCards();renderProgress();renderDeadlines();renderBurnRate();renderBars('testerBars','tester');renderBars('moduleBars','module');renderFilters();renderTable();}
+function statusCounts(list=rows){const c={};list.forEach(r=>{const s=normStatus(r.status);c[s]=(c[s]||0)+1;});return c;}
 function normStatus(s){
   const t=(s||"").toLowerCase().trim();
   if(isDone(t)) return "Passed";
@@ -317,7 +211,6 @@ function normStatus(s){
   if(t.includes("block")) return "Blocked";
   return "Not Started";
 }
-
 function renderCards(){
   const total=rows.length;
   const done=rows.filter(r=>isDone(r.status)).length;
@@ -332,23 +225,17 @@ function renderCards(){
     {h:"⚠️ Overdue",n:overdue,c:"#ef4444",sub:"past due date, not done"},
     {h:"🐞 Defects",n:c["Defect"]||0,c:"#ef4444",sub:""}
   ];
-  document.getElementById('cards').innerHTML=kpi.map(k=>`
-    <div class="stat"><div class="bar-tip" style="background:${k.c}"></div>
-      <h3>${k.h}</h3><div class="num">${k.n}</div><div class="sub">${k.sub}</div></div>`).join('');
+  document.getElementById('cards').innerHTML=kpi.map(k=>`<div class="stat"><div class="bar-tip" style="background:${k.c}"></div><h3>${k.h}</h3><div class="num">${k.n}</div><div class="sub">${k.sub}</div></div>`).join('');
 }
-
 function renderProgress(){
   const total=rows.length, c=statusCounts();
   const order=["Not Started","In Progress","Ready for Retest","Blocked","Defect","Cancelled","Passed"];
   const track=document.getElementById('progressTrack');track.innerHTML='';
-  order.forEach(s=>{if(c[s]){const d=document.createElement('div');
-    d.style.width=(c[s]/total*100)+'%';d.style.background=colorFor(s);d.title=`${s}: ${c[s]}`;track.appendChild(d);}});
-  document.getElementById('legend').innerHTML=order.filter(s=>c[s]).map(s=>
-    `<span><i class="dot" style="background:${colorFor(s)}"></i>${s} (${c[s]})</span>`).join('');
+  order.forEach(s=>{if(c[s]){const d=document.createElement('div');d.style.width=(c[s]/total*100)+'%';d.style.background=colorFor(s);d.title=`${s}: ${c[s]}`;track.appendChild(d);}});
+  document.getElementById('legend').innerHTML=order.filter(s=>c[s]).map(s=>`<span><i class="dot" style="background:${colorFor(s)}"></i>${s} (${c[s]})</span>`).join('');
   const done=rows.filter(r=>isDone(r.status)).length;
   document.getElementById('completionPct').textContent=total?Math.round(done/total*100)+'%':'0%';
 }
-
 function renderDeadlines(){
   const el=document.getElementById('deadlines');
   el.innerHTML=WINDOWS.map(w=>{
@@ -357,291 +244,81 @@ function renderDeadlines(){
     const wd=workingDaysUntil(w.end);
     const daysLeft=daysBetween(today(),new Date(w.end));
     let pill, subtext;
-
-    if(remaining===0){
-      pill=`<span class="pill ok">✅ Done</span>`;
-      subtext=`Due ${w.end}`;
-    }
-    else if(daysLeft<0){
-      // PAST the deadline — don't show a fake "needed/day"
-      pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d PAST DEADLINE • ${remaining} still left</span>`;
-      subtext=`Was due ${w.end} • deadline missed`;
-    }
-    else{
-      const perDay = wd>0 ? (remaining/wd).toFixed(1) : remaining;
-      const risk = wd>0 && (remaining/wd)>3;
-      pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ${perDay}/day needed</span>`;
-      subtext=`Due ${w.end} • ${wd} working days left`;
-    }
-
-    return `<div class="deadline-row">
-      <div><b>${w.label}</b><br><span class="muted">${subtext}</span></div>
-      <div>${pill}</div></div>`;
+    if(remaining===0){pill=`<span class="pill ok">✅ Done</span>`;subtext=`Due ${w.end}`;}
+    else if(daysLeft<0){pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d PAST DEADLINE • ${remaining} still left</span>`;subtext=`Was due ${w.end} • deadline missed`;}
+    else{const perDay=wd>0?(remaining/wd).toFixed(1):remaining;const risk=wd>0&&(remaining/wd)>3;pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ${perDay}/day needed</span>`;subtext=`Due ${w.end} • ${wd} working days left`;}
+    return `<div class="deadline-row"><div><b>${w.label}</b><br><span class="muted">${subtext}</span></div><div>${pill}</div></div>`;
   }).join('');
 }
 function renderBurnRate(){
-  const total = rows.length;
-  const done = rows.filter(r => isDone(r.status)).length;
-  const remaining = total - done;
-
-  // ---- ACTUAL BURN RATE (completed ÷ elapsed working days) ----
-  const startDates = rows.map(r => r.start).filter(Boolean)
-      .map(d => new Date(d)).filter(d => !isNaN(d));
-  const projectStart = startDates.length ? new Date(Math.min(...startDates)) : today();
-
-  let elapsedDays = 0;
-  let d = new Date(projectStart);
-  while(d <= today()){
-      if(d.getDay() !== 0 && d.getDay() !== 6) elapsedDays++;
-      d.setDate(d.getDate()+1);
-  }
-  elapsedDays = Math.max(1, elapsedDays);
-  const actualRate = done / elapsedDays;
-
-  // ---- THE FINAL DEADLINE (last window) ----
-  const finalDeadline = new Date(WINDOWS[WINDOWS.length-1].end);
-  const workingDaysToDeadline = workingDaysUntil(WINDOWS[WINDOWS.length-1].end) || 0;
-  const daysPastDeadline = daysBetween(finalDeadline, today()); // >0 means we're past it
-
-  // ---- REQUIRED RATE to still hit the deadline ----
+  const total=rows.length;
+  const done=rows.filter(r=>isDone(r.status)).length;
+  const remaining=total-done;
+  const startDates=rows.map(r=>r.start).filter(Boolean).map(d=>new Date(d)).filter(d=>!isNaN(d));
+  const projectStart=startDates.length?new Date(Math.min(...startDates)):today();
+  let elapsedDays=0;let d=new Date(projectStart);
+  while(d<=today()){if(d.getDay()!==0&&d.getDay()!==6)elapsedDays++;d.setDate(d.getDate()+1);}
+  elapsedDays=Math.max(1,elapsedDays);
+  const actualRate=done/elapsedDays;
+  const finalDeadline=new Date(WINDOWS[WINDOWS.length-1].end);
+  const workingDaysToDeadline=workingDaysUntil(WINDOWS[WINDOWS.length-1].end)||0;
+  const daysPastDeadline=daysBetween(finalDeadline,today());
   let neededRate;
-  if(remaining === 0){
-      neededRate = 0;
-  } else if(workingDaysToDeadline <= 0){
-      neededRate = null; // deadline passed — "needed/day" no longer meaningful
-  } else {
-      neededRate = remaining / workingDaysToDeadline;
-  }
-
-  // ---- FORECAST FINISH (based on actual pace) ----
-  let forecastText = "—";
-  let forecastDate = null;
-  if(remaining === 0){
-      forecastText = "✅ Complete";
-  } else if(actualRate <= 0){
-      forecastText = "⛔ Stalled (0/day)";
-  } else {
-      const finishDays = Math.ceil(remaining / actualRate);
-      forecastDate = new Date(today());
-      let added = 0;
-      while(added < finishDays){
-          forecastDate.setDate(forecastDate.getDate()+1);
-          if(forecastDate.getDay() !== 0 && forecastDate.getDay() !== 6) added++;
-      }
-      forecastText = forecastDate.toISOString().slice(0,10);
-  }
-
-  // ---- WRITE THE NUMBERS ----
-  document.getElementById('actualBurnRate').textContent = actualRate.toFixed(1);
-  document.getElementById('neededBurnRate').textContent =
-      remaining === 0 ? "0.0" : (neededRate === null ? "—" : neededRate.toFixed(1));
-  document.getElementById('burnDone').textContent = done;
-  document.getElementById('burnRemaining').textContent = remaining;
-  document.getElementById('forecastFinish').textContent = forecastText;
-
-  // ---- PROGRESS BAR (actual vs needed) ----
-  let ratio;
-  if(remaining === 0) ratio = 1;
-  else if(neededRate === null || neededRate === 0) ratio = actualRate>0 ? 1 : 0;
-  else ratio = actualRate / neededRate;
-  document.getElementById('burnRateBar').style.width = Math.min(100, Math.max(0, ratio*100)) + "%";
-
-  // ---- STATUS MESSAGE ----
-  const status = document.getElementById('burnRateStatus');
-  const green = ()=>{status.style.background="#14532d";status.style.color="#bbf7d0";};
-  const red   = ()=>{status.style.background="#7f1d1d";status.style.color="#fecaca";};
-  const amber = ()=>{status.style.background="#78350f";status.style.color="#fed7aa";};
-
-  if(remaining === 0){
-      green();
-      status.innerHTML = "🎉 Testing Complete";
-  }
-  else if(daysPastDeadline > 0){
-      // WE ARE PAST THE DEADLINE — show honest forecast instead of fake "needed/day"
-      red();
-      if(actualRate <= 0){
-          status.innerHTML =
-            `🚨 ${daysPastDeadline}d PAST deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day — no forecast until testing resumes`;
-      } else {
-          const lateDays = daysBetween(finalDeadline, forecastDate);
-          status.innerHTML =
-            `🚨 ${daysPastDeadline}d PAST deadline • ${remaining} left • at ${actualRate.toFixed(1)}/day, forecast finish ${forecastText} (~${lateDays} days late)`;
-      }
-  }
-  else if(actualRate >= neededRate){
-      green();
-      status.innerHTML =
-        `✅ On Track • Current ${actualRate.toFixed(1)}/day ≥ Needed ${neededRate.toFixed(1)}/day • forecast finish ${forecastText}`;
-  }
-  else {
-      amber();
-      const lateDays = forecastDate ? daysBetween(finalDeadline, forecastDate) : null;
-      const lateNote = (lateDays!==null && lateDays>0) ? ` (~${lateDays} days late)` : "";
-      status.innerHTML =
-        `⚠️ Behind Pace • Current ${actualRate.toFixed(1)}/day < Needed ${neededRate.toFixed(1)}/day • forecast finish ${forecastText}${lateNote}`;
-  }
-}
-
-  elapsedDays = Math.max(1, elapsedDays);
-
-  const actualRate = done / elapsedDays;
-
-  // Use the latest due date of unfinished tests instead of the hardcoded window
-
-const unfinished = rows.filter(r =>
-  !isDone(r.status) && r.end
-);
-
-let daysLeft = 0;
-
-if (unfinished.length > 0) {
-
-  const latestDue = unfinished.reduce((max, r) =>
-    new Date(r.end) > max
-      ? new Date(r.end)
-      : max,
-    new Date(unfinished[0].end)
-  );
-
-  daysLeft = workingDaysUntil(
-    latestDue.toISOString().slice(0,10)
-  ) || 0;
-}
-
-let neededRate;
-
-if (remaining === 0) {
-  neededRate = 0;
-}
-else if (daysLeft <= 0) {
-  neededRate = remaining;
-}
-else {
-  neededRate = remaining / daysLeft;
-}
-
-  document.getElementById('actualBurnRate').textContent =
-      actualRate.toFixed(1);
-
-  document.getElementById('neededBurnRate').textContent =
-    remaining > 0
-      ? Math.max(1, neededRate).toFixed(1)
-      : "0.0";
-
-  document.getElementById('burnDone').textContent = done;
-
-  document.getElementById('burnRemaining').textContent =
-      remaining;
-
-  if(actualRate > 0 && remaining > 0){
-
-      const finishDays =
-          Math.ceil(remaining / actualRate);
-
-      let forecast = new Date();
-
-      let added = 0;
-
-      while(added < finishDays){
-          forecast.setDate(forecast.getDate()+1);
-
-          if(
-             forecast.getDay() !== 0 &&
-             forecast.getDay() !== 6
-          ){
-             added++;
-          }
-      }
-
-      document.getElementById('forecastFinish')
-        .textContent =
-        forecast.toISOString().slice(0,10);
-
-  } else {
-      document.getElementById('forecastFinish')
-        .textContent = "Complete";
-  }
-
-  const ratio = neededRate > 0
-      ? actualRate / neededRate
-      : 1;
-
-  document.getElementById('burnRateBar')
-      .style.width =
-      Math.min(100,ratio*100) + "%";
-
-  const status =
-      document.getElementById('burnRateStatus');
-
-  if(remaining === 0){
-      status.style.background="#14532d";
-      status.style.color="#bbf7d0";
-      status.innerHTML="🎉 Testing Complete";
-  }
-  else if(daysLeft <= 0){
-    status.style.background="#7f1d1d";
-    status.style.color="#fecaca";
-    status.innerHTML=
-      `🚨 ${remaining} scenarios remain and the deadline has been reached`;
-}
-  else if(actualRate >= neededRate){
-      status.style.background="#14532d";
-      status.style.color="#bbf7d0";
-      status.innerHTML=
-      `✅ On Track | Current: ${actualRate.toFixed(1)}/day | Needed: ${neededRate.toFixed(1)}/day`;
-  }
+  if(remaining===0){neededRate=0;}
+  else if(workingDaysToDeadline<=0){neededRate=null;}
+  else{neededRate=remaining/workingDaysToDeadline;}
+  let forecastText="—";let forecastDate=null;
+  if(remaining===0){forecastText="✅ Complete";}
+  else if(actualRate<=0){forecastText="⛔ Stalled (0/day)";}
   else{
-      status.style.background="#7f1d1d";
-      status.style.color="#fecaca";
-      status.innerHTML=
-      `🚨 Behind Pace | Current: ${actualRate.toFixed(1)}/day | Needed: ${neededRate.toFixed(1)}/day`;
+    const finishDays=Math.ceil(remaining/actualRate);
+    forecastDate=new Date(today());let added=0;
+    while(added<finishDays){forecastDate.setDate(forecastDate.getDate()+1);if(forecastDate.getDay()!==0&&forecastDate.getDay()!==6)added++;}
+    forecastText=forecastDate.toISOString().slice(0,10);
   }
+  document.getElementById('actualBurnRate').textContent=actualRate.toFixed(1);
+  document.getElementById('neededBurnRate').textContent=remaining===0?"0.0":(neededRate===null?"—":neededRate.toFixed(1));
+  document.getElementById('burnDone').textContent=done;
+  document.getElementById('burnRemaining').textContent=remaining;
+  document.getElementById('forecastFinish').textContent=forecastText;
+  let ratio;
+  if(remaining===0)ratio=1;
+  else if(neededRate===null||neededRate===0)ratio=actualRate>0?1:0;
+  else ratio=actualRate/neededRate;
+  document.getElementById('burnRateBar').style.width=Math.min(100,Math.max(0,ratio*100))+"%";
+  const status=document.getElementById('burnRateStatus');
+  const green=()=>{status.style.background="#14532d";status.style.color="#bbf7d0";};
+  const red=()=>{status.style.background="#7f1d1d";status.style.color="#fecaca";};
+  const amber=()=>{status.style.background="#78350f";status.style.color="#fed7aa";};
+  if(remaining===0){green();status.innerHTML="🎉 Testing Complete";}
+  else if(daysPastDeadline>0){
+    red();
+    if(actualRate<=0){status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day — no forecast until testing resumes`;}
+    else{const lateDays=daysBetween(finalDeadline,forecastDate);status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline • ${remaining} left • at ${actualRate.toFixed(1)}/day, forecast finish ${forecastText} (~${lateDays} days late)`;}
+  }
+  else if(actualRate>=neededRate){green();status.innerHTML=`✅ On Track • Current ${actualRate.toFixed(1)}/day ≥ Needed ${neededRate.toFixed(1)}/day • forecast finish ${forecastText}`;}
+  else{amber();const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;const lateNote=(lateDays!==null&&lateDays>0)?` (~${lateDays} days late)`:"";status.innerHTML=`⚠️ Behind Pace • Current ${actualRate.toFixed(1)}/day < Needed ${neededRate.toFixed(1)}/day • forecast finish ${forecastText}${lateNote}`;}
 }
-
 function renderBars(elId,key){
   const grp={};
   rows.forEach(r=>{const k=r[key]||"(none)";grp[k]=grp[k]||{total:0,done:0};grp[k].total++;if(isDone(r.status))grp[k].done++;});
-  const entries=Object.entries(grp).map(([k,v])=>({k,rem:v.total-v.done,total:v.total,done:v.done}))
-    .filter(e=>e.rem>0).sort((a,b)=>b.rem-a.rem);
+  const entries=Object.entries(grp).map(([k,v])=>({k,rem:v.total-v.done,total:v.total,done:v.done})).filter(e=>e.rem>0).sort((a,b)=>b.rem-a.rem);
   const max=Math.max(1,...entries.map(e=>e.total));
-  document.getElementById(elId).innerHTML = entries.length? entries.map(e=>`
-    <div class="row"><div class="lbl" title="${e.k}">${e.k}</div>
-      <div class="track">
-        <div class="seg" style="width:${e.done/max*100}%;background:#22c55e" title="Done: ${e.done}"></div>
-        <div class="seg" style="width:${e.rem/max*100}%;background:#f59e0b" title="Remaining: ${e.rem}"></div>
-      </div>
-      <div class="val">${e.rem} left</div></div>`).join('')
-    : `<div class="muted">🎉 Nothing remaining here.</div>`;
+  document.getElementById(elId).innerHTML=entries.length?entries.map(e=>`<div class="row"><div class="lbl" title="${e.k}">${e.k}</div><div class="track"><div class="seg" style="width:${e.done/max*100}%;background:#22c55e" title="Done: ${e.done}"></div><div class="seg" style="width:${e.rem/max*100}%;background:#f59e0b" title="Remaining: ${e.rem}"></div></div><div class="val">${e.rem} left</div></div>`).join(''):`<div class="muted">🎉 Nothing remaining here.</div>`;
 }
-
-function renderFilters(){
-  fillSel('filterTester',uniq('tester'));
-  fillSel('filterModule',uniq('module'));
-  fillSel('filterStatus',[...new Set(rows.map(r=>normStatus(r.status)))].sort());
-}
+function renderFilters(){fillSel('filterTester',uniq('tester'));fillSel('filterModule',uniq('module'));fillSel('filterStatus',[...new Set(rows.map(r=>normStatus(r.status)))].sort());}
 function uniq(k){return [...new Set(rows.map(r=>r[k]).filter(Boolean))].sort();}
-function fillSel(id,vals){
-  const el=document.getElementById(id),cur=el.value,first=el.querySelector('option');
-  el.innerHTML='';el.appendChild(first);
-  vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);});
-  el.value=cur;
-}
-
+function fillSel(id,vals){const el=document.getElementById(id),cur=el.value,first=el.querySelector('option');el.innerHTML='';el.appendChild(first);vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);});el.value=cur;}
 function currentRows(){
   const q=document.getElementById('search').value.toLowerCase();
   const ft=document.getElementById('filterTester').value;
   const fm=document.getElementById('filterModule').value;
   const fs=document.getElementById('filterStatus').value;
   const openOnly=document.getElementById('onlyOpen').checked;
-  let list=rows.filter(r=>{
-    const hay=(r.id+r.module+r.scenario+r.tester+r.status).toLowerCase();
-    return (!q||hay.includes(q)) && (!ft||r.tester===ft) && (!fm||r.module===fm)
-      && (!fs||normStatus(r.status)===fs) && (!openOnly||!isDone(r.status));
-  });
+  let list=rows.filter(r=>{const hay=(r.id+r.module+r.scenario+r.tester+r.status).toLowerCase();return (!q||hay.includes(q))&&(!ft||r.tester===ft)&&(!fm||r.module===fm)&&(!fs||normStatus(r.status)===fs)&&(!openOnly||!isDone(r.status));});
   if(sortKey){list=[...list].sort((a,b)=>(''+(a[sortKey]||'')).localeCompare(''+(b[sortKey]||''))*sortDir);}
   return list;
 }
-
 function paceTag(r){
   if(isDone(r.status)) return `<span class="pill ok">Done</span>`;
   if(!r.end) return `<span class="muted">—</span>`;
@@ -651,39 +328,22 @@ function paceTag(r){
   if(d<=1) return `<span class="pill due">Due tomorrow</span>`;
   return `<span class="pill ok">${d}d left</span>`;
 }
-
 function renderTable(){
   const tb=document.getElementById('tbody');
-  tb.innerHTML=currentRows().map(r=>{
-    const s=normStatus(r.status);
-    return `<tr>
-      <td>${esc(r.id)}</td><td>${esc(r.module)}</td><td>${esc(r.scenario)}</td>
-      <td>${esc(r.tester)}</td><td>${esc(r.end)||'<span class="muted">—</span>'}</td>
-      <td><span class="badge" style="background:${colorFor(s)}">${s}</span></td>
-      <td>${paceTag(r)}</td></tr>`;
-  }).join('') || `<tr><td colspan="7" class="muted" style="padding:18px">🎉 Nothing matches — all clear!</td></tr>`;
+  tb.innerHTML=currentRows().map(r=>{const s=normStatus(r.status);return `<tr><td>${esc(r.id)}</td><td>${esc(r.module)}</td><td>${esc(r.scenario)}</td><td>${esc(r.tester)}</td><td>${esc(r.end)||'<span class="muted">—</span>'}</td><td><span class="badge" style="background:${colorFor(s)}">${s}</span></td><td>${paceTag(r)}</td></tr>`;}).join('')||`<tr><td colspan="7" class="muted" style="padding:18px">🎉 Nothing matches — all clear!</td></tr>`;
 }
-
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-/* ================= EXPORT ================= */
 window.exportRemaining=()=>{
   const list=rows.filter(r=>!isDone(r.status));
   const head=["Test ID","Module","Scenario","Tester","Due","Status"];
   const lines=[head.join(',')];
-  list.forEach(r=>lines.push([r.id,r.module,r.scenario,r.tester,r.end,normStatus(r.status)]
-    .map(x=>`"${String(x||'').replace(/"/g,'""')}"`).join(',')));
+  list.forEach(r=>lines.push([r.id,r.module,r.scenario,r.tester,r.end,normStatus(r.status)].map(x=>`"${String(x||'').replace(/"/g,'""')}"`).join(',')));
   const blob=new Blob([lines.join('\n')],{type:'text/csv'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='VNDLY_Whats_Left_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 };
-
-/* ================= LISTENERS ================= */
-['search','filterTester','filterModule','filterStatus','onlyOpen'].forEach(id=>
-  document.getElementById(id).addEventListener('input',renderTable));
-document.querySelectorAll('th[data-k]').forEach(th=>th.addEventListener('click',()=>{
-  const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();
-}));
+['search','filterTester','filterModule','filterStatus','onlyOpen'].forEach(id=>document.getElementById(id).addEventListener('input',renderTable));
+document.querySelectorAll('th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();}));
 </script>
 </body>
-</html>
+</html>	
