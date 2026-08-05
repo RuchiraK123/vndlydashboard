@@ -108,8 +108,8 @@
       <div id="burnRateStatus" style="padding:12px;border-radius:10px;background:#14532d;color:#bbf7d0;font-size:13px;font-weight:600;">✅ Waiting for data...</div>
       <div class="hint" style="line-height:1.6;">
         <b>Actual Burn Rate</b> = Completed ÷ elapsed <b>business days</b> (Mon–Fri, weekends excluded), rounded to a whole number.<br>
-        <b>Required Rate</b> = Remaining ÷ business days left until deadline — recalculates daily (rises if behind, falls if ahead).<br>
-        <b>Forecast Finish</b> = "Evaluate as of" date (auto-read from filename) + (Remaining ÷ Actual Burn Rate) <b>business days</b>, skipping weekends.
+        <b>Required Rate</b> = Remaining ÷ business days left (includes today &amp; the deadline day) — recalculates as the date changes.<br>
+        <b>Forecast Finish</b> = "Evaluate as of" date + (Remaining ÷ Actual Burn Rate) <b>business days</b>, skipping weekends.
       </div>
     </div>
     <div class="panels">
@@ -155,13 +155,35 @@ const WINDOWS = [
 let rows=[];
 let sortKey=null, sortDir=1;
 
-/* ================= "AS OF" DATE ================= */
+/* ================= DATE HELPERS ================= */
+function daysBetween(a,b){return Math.round((b-a)/(1000*60*60*24));}
+
+/* parse a date as LOCAL midnight (avoids UTC off-by-one bug) */
+function parseLocal(dateStr){
+  if(dateStr instanceof Date) return new Date(dateStr.getFullYear(),dateStr.getMonth(),dateStr.getDate());
+  const s=String(dateStr).slice(0,10);
+  const p=s.split('-');
+  if(p.length===3 && p[0].length===4) return new Date(+p[0],+p[1]-1,+p[2]);
+  const d=new Date(s); return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+
 function asOf(){
   const el=document.getElementById('asOfDate');
-  if(el && el.value){return new Date(el.value+"T00:00:00");}
-  return new Date(new Date().toDateString());
+  if(el && el.value){return parseLocal(el.value);}
+  const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate());
 }
 function today(){return asOf();}
+
+/* Business days from as-of date THROUGH target date, INCLUSIVE of both ends. */
+function workingDaysUntil(dateStr){
+  const end=parseLocal(dateStr);
+  const start=parseLocal(today());
+  if(!end||isNaN(end.getTime())) return null;
+  if(end<start) return 0;
+  let count=0, d=new Date(start);
+  while(d<=end){const wd=d.getDay();if(wd!==0&&wd!==6)count++;d.setDate(d.getDate()+1);}
+  return count;
+}
 
 function parseDateFromFilename(name){
   if(!name) return null;
@@ -230,21 +252,19 @@ function fmtDate(val){
   if(typeof val==="number"){const d=new Date(Math.round((val-25569)*86400*1000));return d.toISOString().slice(0,10);}
   const s=String(val).trim();const d=new Date(s);return isNaN(d)? s : d.toISOString().slice(0,10);
 }
-function daysBetween(a,b){return Math.round((b-a)/(1000*60*60*24));}
-
-/* Business days from as-of date THROUGH target date (both inclusive). */
-function workingDaysUntil(dateStr){
-  const end=new Date(new Date(dateStr).toDateString());
-  const start=new Date(today().toDateString());
-  if(isNaN(end.getTime())) return null;
-  if(end<start) return 0;
-  let count=0, d=new Date(start);
-  while(d<=end){const wd=d.getDay();if(wd!==0&&wd!==6)count++;d.setDate(d.getDate()+1);}
-  return count;
-}
 
 /* ================= RENDER ================= */
-function renderAll(){renderCards();renderProgress();renderDeadlines();renderBurnRate();renderBars('testerBars','tester');renderBars('moduleBars','module');renderFilters();renderTable();}
+function renderAll(){
+  try{
+    renderCards();renderProgress();renderDeadlines();renderBurnRate();
+    renderBars('testerBars','tester');renderBars('moduleBars','module');
+    renderFilters();renderTable();
+  }catch(err){
+    console.error("Dashboard render error:",err);
+    const s=document.getElementById('burnRateStatus');
+    if(s){s.style.background="#7f1d1d";s.style.color="#fecaca";s.innerHTML="⛔ Render error: "+(err&&err.message?err.message:err)+"<br><span style='font-weight:400;font-size:11px'>Check console (F12) for details.</span>";}
+  }
+}
 function statusCounts(list=rows){const c={};list.forEach(r=>{const s=normStatus(r.status);c[s]=(c[s]||0)+1;});return c;}
 function normStatus(s){
   const t=(s||"").toLowerCase().trim();
@@ -261,7 +281,7 @@ function renderCards(){
   const done=rows.filter(r=>isDone(r.status)).length;
   const remaining=total-done;
   const c=statusCounts();
-  const overdue=rows.filter(r=>!isDone(r.status)&&r.end&&new Date(r.end)<today()).length;
+  const overdue=rows.filter(r=>!isDone(r.status)&&r.end&&parseLocal(r.end)<parseLocal(today())).length;
   const kpi=[
     {h:"Total Scenarios",n:total,c:"#38bdf8",sub:""},
     {h:"✅ Done",n:done,c:"#22c55e",sub:total?Math.round(done/total*100)+"% complete":""},
@@ -284,26 +304,22 @@ function renderProgress(){
 function renderDeadlines(){
   const el=document.getElementById('deadlines');
   el.innerHTML=WINDOWS.map(w=>{
-    const inWin=rows.filter(r=>r.end && new Date(r.end)<=new Date(w.end));
+    const inWin=rows.filter(r=>r.end && parseLocal(r.end)<=parseLocal(w.end));
     const remaining=inWin.filter(r=>!isDone(r.status)).length;
     const wd=workingDaysUntil(w.end);
-    const daysLeft=daysBetween(today(),new Date(w.end));
+    const daysLeft=daysBetween(parseLocal(today()),parseLocal(w.end));
     let pill, subtext;
     if(remaining===0){
       pill=`<span class="pill ok">✅ Done</span>`;
       subtext=`Due ${w.end} — all scenarios in this window complete`;
     } else if(daysLeft<0){
-      pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d PAST DEADLINE • ${remaining} still left</span>`;
+      pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d past deadline • ${remaining} still left</span>`;
       subtext=`Was due ${w.end} • deadline missed`;
     } else {
-      const perDayNum = wd>0 ? (remaining/wd) : remaining;
-      const perDay = Math.ceil(perDayNum);
-      let urgency="";
-      if(wd<=1) urgency=" — last day, very tight";
-      else if(perDayNum>4) urgency=" — high pace needed";
-      const risk = perDayNum>3;
-      const dayWord = wd===1 ? "1 business day left (today only)" : `${wd} business days left`;
-      pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ~${perDay}/day needed${urgency}</span>`;
+      const perDay = wd>0 ? Math.ceil(remaining/wd) : remaining;
+      const risk = wd>0 && (remaining/wd)>3;
+      const dayWord = wd===1 ? "1 business day left" : `${wd} business days left`;
+      pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ~${perDay}/day needed</span>`;
       subtext=`Due ${w.end} • ${dayWord}`;
     }
     return `<div class="deadline-row"><div><b>${w.label}</b><br><span class="muted">${subtext}</span></div><div>${pill}</div></div>`;
@@ -313,16 +329,15 @@ function renderBurnRate(){
   const total=rows.length;
   const done=rows.filter(r=>isDone(r.status)).length;
   const remaining=total-done;
-  const startDates=rows.map(r=>r.start).filter(Boolean).map(d=>new Date(d)).filter(d=>!isNaN(d));
-  let projectStart = startDates.length ? new Date(Math.min(...startDates)) : new Date(today());
-  projectStart = new Date(projectStart.toDateString());
+  const startDates=rows.map(r=>r.start).filter(Boolean).map(d=>parseLocal(d)).filter(d=>d&&!isNaN(d));
+  let projectStart = startDates.length ? new Date(Math.min(...startDates.map(d=>d.getTime()))) : parseLocal(today());
+  const asOfDay=parseLocal(today());
   let elapsedDays=0, d=new Date(projectStart);
-  const asOfDay=new Date(today());
   while(d<=asOfDay){const wd=d.getDay();if(wd!==0&&wd!==6)elapsedDays++;d.setDate(d.getDate()+1);}
   elapsedDays=Math.max(1,elapsedDays);
   const actualRatePrecise=done/elapsedDays;
   const actualRateWhole=Math.round(actualRatePrecise);
-  const finalDeadline=new Date(WINDOWS[WINDOWS.length-1].end);
+  const finalDeadline=parseLocal(WINDOWS[WINDOWS.length-1].end);
   const workingDaysToDeadline=workingDaysUntil(WINDOWS[WINDOWS.length-1].end)||0;
   const daysPastDeadline=daysBetween(finalDeadline,asOfDay);
   let neededRate;
@@ -333,10 +348,14 @@ function renderBurnRate(){
   if(remaining===0){forecastText="✅ Complete";}
   else if(actualRatePrecise<=0){forecastText="⛔ Stalled (0/day)";}
   else{
-    const finishDays=Math.ceil(remaining/actualRatePrecise);
+    const finishDays=Math.max(1,Math.round(remaining/actualRatePrecise));
     forecastDate=new Date(asOfDay);let added=0;
-    while(added<finishDays){forecastDate.setDate(forecastDate.getDate()+1);if(forecastDate.getDay()!==0&&forecastDate.getDay()!==6)added++;}
-    forecastText=forecastDate.toISOString().slice(0,10);
+    while(added<finishDays){
+      if(forecastDate.getDay()!==0 && forecastDate.getDay()!==6) added++;
+      if(added>=finishDays) break;
+      forecastDate.setDate(forecastDate.getDate()+1);
+    }
+    forecastText=`${forecastDate.getFullYear()}-${String(forecastDate.getMonth()+1).padStart(2,'0')}-${String(forecastDate.getDate()).padStart(2,'0')}`;
   }
   document.getElementById('actualBurnRate').textContent=actualRateWhole;
   document.getElementById('neededBurnRate').textContent=remaining===0?"0":(neededRate===null?"—":Math.ceil(neededRate));
@@ -362,8 +381,8 @@ function renderBurnRate(){
   if(remaining===0){green();status.innerHTML="🎉 Testing Complete";}
   else if(daysPastDeadline>0){
     red();
-    if(actualRatePrecise<=0){status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day`;}
-    else{const lateDays=daysBetween(finalDeadline,forecastDate);status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline • ${remaining} left • at ~${actualRateWhole}/day, forecast finish ${forecastText} (~${lateDays} days late)`;}
+    if(actualRatePrecise<=0){status.innerHTML=`🚨 ${daysPastDeadline}d past deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day`;}
+    else{const lateDays=daysBetween(finalDeadline,forecastDate);status.innerHTML=`🚨 ${daysPastDeadline}d past deadline • ${remaining} left • at ~${actualRateWhole}/day, forecast finish ${forecastText}${lateDays>0?` (~${lateDays} days late)`:''}`;}
   }
   else if(actualRatePrecise>=neededRate){green();status.innerHTML=`✅ On Track • ~${actualRateWhole}/day ≥ Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}`;}
   else{amber();const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;const lateNote=(lateDays!==null&&lateDays>0)?` (~${lateDays} days late)`:"";status.innerHTML=`⚠️ Behind Pace • ~${actualRateWhole}/day < Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}${lateNote}`;}
@@ -391,11 +410,11 @@ function currentRows(){
 function paceTag(r){
   if(isDone(r.status)) return `<span class="pill ok">Done</span>`;
   if(!r.end) return `<span class="muted">—</span>`;
-  const d=daysBetween(today(),new Date(r.end));
-  if(d<0) return `<span class="pill risk">Overdue ${-d}d</span>`;
-  if(d===0) return `<span class="pill due">Due today</span>`;
-  if(d<=1) return `<span class="pill due">Due tomorrow</span>`;
-  return `<span class="pill ok">${d}d left</span>`;
+  const dl=daysBetween(parseLocal(today()),parseLocal(r.end));
+  if(dl<0) return `<span class="pill risk">Overdue ${-dl}d</span>`;
+  if(dl===0) return `<span class="pill due">Due today</span>`;
+  if(dl<=1) return `<span class="pill due">Due tomorrow</span>`;
+  return `<span class="pill ok">${dl}d left</span>`;
 }
 function renderTable(){
   const tb=document.getElementById('tbody');
