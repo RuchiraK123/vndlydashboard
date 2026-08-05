@@ -56,6 +56,10 @@
   .hidden{display:none;}
   .deadline-grid{display:grid;grid-template-columns:1fr;gap:8px;}
   .deadline-row{display:flex;justify-content:space-between;align-items:center;background:#0b1120;border-radius:8px;padding:10px 12px;font-size:13px;}
+  .asof{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:18px;flex-wrap:wrap;}
+  .asof label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+  .asof input{background:#0b1120;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;}
+  .asof .note{font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -71,6 +75,11 @@
     <input type="file" id="file" accept=".xlsx,.xls,.csv" class="hidden">
   </div>
   <div id="dashboard" class="hidden">
+    <div class="asof">
+      <label for="asOfDate">📅 Evaluate as of:</label>
+      <input type="date" id="asOfDate">
+      <span class="note">Defaults to today. Set this to match the date of your tracker snapshot so pacing & forecast are accurate.</span>
+    </div>
     <div class="cards" id="cards"></div>
     <div class="panels">
       <div class="panel">
@@ -82,14 +91,14 @@
       <div class="panel">
         <h2>⏱️ Deadline Pacing — Are We On Track?</h2>
         <div class="deadline-grid" id="deadlines"></div>
-        <div class="hint">"Needed/day" = remaining tests in that window ÷ working days left.</div>
+        <div class="hint">"Needed/day" = remaining tests in that window ÷ business days left.</div>
       </div>
     </div>
     <div class="panel">
       <h2>🔥 Burn Rate & Forecast</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px;">
         <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">ACTUAL BURN RATE</div><div id="actualBurnRate" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">completed/day</div></div>
-        <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">REQUIRED RATE</div><div id="neededBurnRate" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">needed/day</div></div>
+        <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">REQUIRED RATE</div><div id="neededBurnRate" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">needed/day</div><div id="neededRateNote" style="font-size:11px;font-weight:600;margin-top:4px;">—</div></div>
         <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">COMPLETED</div><div id="burnDone" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">scenarios</div></div>
         <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">REMAINING</div><div id="burnRemaining" style="font-size:24px;font-weight:700;">0</div><div class="muted" style="font-size:12px;">scenarios</div></div>
         <div style="background:#0b1120;border-radius:10px;padding:12px;"><div class="muted" style="font-size:11px;">FORECAST FINISH</div><div id="forecastFinish" style="font-size:18px;font-weight:700;">—</div><div class="muted" style="font-size:12px;">based on current pace</div></div>
@@ -97,7 +106,11 @@
       <div class="muted" style="font-size:12px;margin-bottom:6px;">Actual Pace vs Pace Needed To Hit Deadline</div>
       <div style="height:12px;background:#0b1120;border-radius:20px;overflow:hidden;margin-bottom:12px;"><div id="burnRateBar" style="height:100%;width:0%;background:linear-gradient(90deg,#22c55e,#38bdf8);"></div></div>
       <div id="burnRateStatus" style="padding:12px;border-radius:10px;background:#14532d;color:#bbf7d0;font-size:13px;font-weight:600;">✅ Waiting for data...</div>
-      <div class="hint">Burn Rate = completed scenarios ÷ elapsed working days. Forecast estimates finish date using current velocity.</div>
+      <div class="hint" style="line-height:1.6;">
+        <b>Actual Burn Rate</b> = Completed ÷ elapsed <b>business days</b> (Mon–Fri, weekends excluded), rounded to a whole number.<br>
+        <b>Required Rate</b> = Remaining ÷ business days left until deadline — recalculates daily (rises if behind, falls if ahead).<br>
+        <b>Forecast Finish</b> = "Evaluate as of" date + (Remaining ÷ Actual Burn Rate) <b>business days</b>, skipping weekends.
+      </div>
     </div>
     <div class="panels">
       <div class="panel"><h2>Remaining Work by Tester</h2><div class="bars" id="testerBars"></div></div>
@@ -142,6 +155,15 @@ const WINDOWS = [
 let rows=[];
 let sortKey=null, sortDir=1;
 
+/* ================= "AS OF" DATE (fixes the past-deadline bug) ================= */
+// Everything is calculated relative to this date, NOT the computer clock.
+function asOf(){
+  const el=document.getElementById('asOfDate');
+  if(el && el.value){return new Date(el.value+"T00:00:00");}
+  return new Date(new Date().toDateString());
+}
+function today(){return asOf();}   // all logic now uses the "as of" date
+
 /* ================= FILE LOADING ================= */
 const drop=document.getElementById('drop'), fileInput=document.getElementById('file');
 drop.addEventListener('click',()=>fileInput.click());
@@ -164,6 +186,9 @@ function handleFile(f){
     if(!parsed||!parsed.length){alert("Couldn't find a 'Test ID' column. Make sure this is the tracker download.");return;}
     rows=parsed;
     document.getElementById('dashboard').classList.remove('hidden');
+    // default the as-of date to today (only if not already set)
+    const asOfEl=document.getElementById('asOfDate');
+    if(asOfEl && !asOfEl.value){asOfEl.value=new Date().toISOString().slice(0,10);}
     document.getElementById('fileInfo').textContent=`Loaded: ${f.name} • ${rows.length} scenarios • ${new Date().toLocaleString()}`;
     renderAll();
   };
@@ -189,11 +214,10 @@ function fmtDate(val){
   if(typeof val==="number"){const d=new Date(Math.round((val-25569)*86400*1000));return d.toISOString().slice(0,10);}
   const s=String(val).trim();const d=new Date(s);return isNaN(d)? s : d.toISOString().slice(0,10);
 }
-function today(){return new Date(new Date().toDateString());}
 function daysBetween(a,b){return Math.round((b-a)/(1000*60*60*24));}
 function workingDaysUntil(dateStr){
   const end=new Date(dateStr); if(isNaN(end)) return null;
-  let d=today(), count=0;
+  let d=new Date(today()), count=0;
   while(d<=end){const wd=d.getDay(); if(wd!==0&&wd!==6) count++; d=new Date(d.getTime()+86400000);}
   return count;
 }
@@ -246,7 +270,7 @@ function renderDeadlines(){
     let pill, subtext;
     if(remaining===0){pill=`<span class="pill ok">✅ Done</span>`;subtext=`Due ${w.end}`;}
     else if(daysLeft<0){pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d PAST DEADLINE • ${remaining} still left</span>`;subtext=`Was due ${w.end} • deadline missed`;}
-    else{const perDay=wd>0?(remaining/wd).toFixed(1):remaining;const risk=wd>0&&(remaining/wd)>3;pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ${perDay}/day needed</span>`;subtext=`Due ${w.end} • ${wd} working days left`;}
+    else{const perDay=wd>0?Math.ceil(remaining/wd):remaining;const risk=wd>0&&(remaining/wd)>3;pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ${perDay}/day needed</span>`;subtext=`Due ${w.end} • ${wd} business days left`;}
     return `<div class="deadline-row"><div><b>${w.label}</b><br><span class="muted">${subtext}</span></div><div>${pill}</div></div>`;
   }).join('');
 }
@@ -259,7 +283,8 @@ function renderBurnRate(){
   let elapsedDays=0;let d=new Date(projectStart);
   while(d<=today()){if(d.getDay()!==0&&d.getDay()!==6)elapsedDays++;d.setDate(d.getDate()+1);}
   elapsedDays=Math.max(1,elapsedDays);
-  const actualRate=done/elapsedDays;
+  const actualRatePrecise=done/elapsedDays;
+  const actualRateWhole=Math.round(actualRatePrecise);
   const finalDeadline=new Date(WINDOWS[WINDOWS.length-1].end);
   const workingDaysToDeadline=workingDaysUntil(WINDOWS[WINDOWS.length-1].end)||0;
   const daysPastDeadline=daysBetween(finalDeadline,today());
@@ -269,22 +294,29 @@ function renderBurnRate(){
   else{neededRate=remaining/workingDaysToDeadline;}
   let forecastText="—";let forecastDate=null;
   if(remaining===0){forecastText="✅ Complete";}
-  else if(actualRate<=0){forecastText="⛔ Stalled (0/day)";}
+  else if(actualRatePrecise<=0){forecastText="⛔ Stalled (0/day)";}
   else{
-    const finishDays=Math.ceil(remaining/actualRate);
+    const finishDays=Math.ceil(remaining/actualRatePrecise);
     forecastDate=new Date(today());let added=0;
     while(added<finishDays){forecastDate.setDate(forecastDate.getDate()+1);if(forecastDate.getDay()!==0&&forecastDate.getDay()!==6)added++;}
     forecastText=forecastDate.toISOString().slice(0,10);
   }
-  document.getElementById('actualBurnRate').textContent=actualRate.toFixed(1);
-  document.getElementById('neededBurnRate').textContent=remaining===0?"0.0":(neededRate===null?"—":neededRate.toFixed(1));
+  document.getElementById('actualBurnRate').textContent=actualRateWhole;
+  document.getElementById('neededBurnRate').textContent=remaining===0?"0":(neededRate===null?"—":Math.ceil(neededRate));
   document.getElementById('burnDone').textContent=done;
   document.getElementById('burnRemaining').textContent=remaining;
   document.getElementById('forecastFinish').textContent=forecastText;
+  const reqNote=document.getElementById('neededRateNote');
+  if(reqNote){
+    if(remaining===0){reqNote.textContent="all done";reqNote.style.color="#22c55e";}
+    else if(neededRate===null){reqNote.textContent="deadline passed";reqNote.style.color="#f87171";}
+    else if(actualRatePrecise>=neededRate){reqNote.textContent="✅ on/ahead of pace";reqNote.style.color="#22c55e";}
+    else{const gap=Math.ceil(neededRate-actualRatePrecise);reqNote.textContent=`⚠️ need +${gap}/day faster`;reqNote.style.color="#fbbf24";}
+  }
   let ratio;
   if(remaining===0)ratio=1;
-  else if(neededRate===null||neededRate===0)ratio=actualRate>0?1:0;
-  else ratio=actualRate/neededRate;
+  else if(neededRate===null||neededRate===0)ratio=actualRatePrecise>0?1:0;
+  else ratio=actualRatePrecise/neededRate;
   document.getElementById('burnRateBar').style.width=Math.min(100,Math.max(0,ratio*100))+"%";
   const status=document.getElementById('burnRateStatus');
   const green=()=>{status.style.background="#14532d";status.style.color="#bbf7d0";};
@@ -293,11 +325,11 @@ function renderBurnRate(){
   if(remaining===0){green();status.innerHTML="🎉 Testing Complete";}
   else if(daysPastDeadline>0){
     red();
-    if(actualRate<=0){status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day — no forecast until testing resumes`;}
-    else{const lateDays=daysBetween(finalDeadline,forecastDate);status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline • ${remaining} left • at ${actualRate.toFixed(1)}/day, forecast finish ${forecastText} (~${lateDays} days late)`;}
+    if(actualRatePrecise<=0){status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day — no forecast until testing resumes`;}
+    else{const lateDays=daysBetween(finalDeadline,forecastDate);status.innerHTML=`🚨 ${daysPastDeadline}d PAST deadline • ${remaining} left • at ~${actualRateWhole}/day, forecast finish ${forecastText} (~${lateDays} days late)`;}
   }
-  else if(actualRate>=neededRate){green();status.innerHTML=`✅ On Track • Current ${actualRate.toFixed(1)}/day ≥ Needed ${neededRate.toFixed(1)}/day • forecast finish ${forecastText}`;}
-  else{amber();const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;const lateNote=(lateDays!==null&&lateDays>0)?` (~${lateDays} days late)`:"";status.innerHTML=`⚠️ Behind Pace • Current ${actualRate.toFixed(1)}/day < Needed ${neededRate.toFixed(1)}/day • forecast finish ${forecastText}${lateNote}`;}
+  else if(actualRatePrecise>=neededRate){green();status.innerHTML=`✅ On Track • Current ~${actualRateWhole}/day ≥ Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}`;}
+  else{amber();const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;const lateNote=(lateDays!==null&&lateDays>0)?` (~${lateDays} days late)`:"";status.innerHTML=`⚠️ Behind Pace • Current ~${actualRateWhole}/day < Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}${lateNote}`;}
 }
 function renderBars(elId,key){
   const grp={};
@@ -343,7 +375,8 @@ window.exportRemaining=()=>{
   a.download='VNDLY_Whats_Left_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 };
 ['search','filterTester','filterModule','filterStatus','onlyOpen'].forEach(id=>document.getElementById(id).addEventListener('input',renderTable));
+document.getElementById('asOfDate').addEventListener('change',()=>{if(rows.length)renderAll();});
 document.querySelectorAll('th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();}));
 </script>
 </body>
-</html>	
+</html>
