@@ -88,9 +88,34 @@
       <label for="revisedDeadline" style="margin-left:10px;">🔄 Revised deadline:</label>
       <input type="date" id="revisedDeadline">
       <button class="btn-ghost" id="clearRevised" style="padding:6px 10px;">Clear</button>
+      <label for="viewMode" style="margin-left:14px;">👁️ View:</label>
+      <select id="viewMode" style="background:#0b1120;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;">
+        <option value="pmo">PMO — Full Detail</option>
+        <option value="steer">Steering Committee — Summary</option>
+      </select>
       <span class="note">Evaluation date auto-reads from the filename (e.g. <b>073026</b> → Jul 30, 2026). <b>Revised deadline is optional</b> — set it only if the original deadline was pushed to a new target. Leave blank to use the original.</span>
     </div>
 
+    <!-- STEERING COMMITTEE VIEW -->
+    <div id="steerView" class="hidden">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:22px;">
+        <div class="stat"><div class="bar-tip" style="background:#22c55e"></div><h3>Complete</h3><div class="num" id="svPct">0%</div><div class="sub" id="svDone">0 of 0 scenarios</div></div>
+        <div class="stat"><div class="bar-tip" style="background:#f59e0b"></div><h3>Remaining</h3><div class="num" id="svRemaining">0</div><div class="sub">scenarios left</div></div>
+        <div class="stat"><div class="bar-tip" style="background:#ef4444"></div><h3>Overdue</h3><div class="num" id="svOverdue">0</div><div class="sub">past due, not done</div></div>
+        <div class="stat"><div class="bar-tip" style="background:#38bdf8"></div><h3>Forecast Finish</h3><div class="num" id="svForecast" style="font-size:22px;">—</div><div class="sub" id="svDeadline">vs deadline</div></div>
+      </div>
+      <div class="panel" style="margin-bottom:22px;">
+        <h2>Overall Completion</h2>
+        <div class="progress-track" id="svProgressTrack"></div>
+        <div class="legend" id="svLegend"></div>
+        <div style="margin-top:14px;font-size:15px;">Completion: <b id="svCompletionPct">0%</b></div>
+      </div>
+      <div id="svBanner" style="padding:22px;border-radius:14px;background:#14532d;color:#bbf7d0;font-size:18px;font-weight:700;text-align:center;">Waiting for data…</div>
+      <div id="svSummary" class="hint" style="text-align:center;font-size:14px;margin-top:12px;"></div>
+    </div>
+
+    <!-- PMO VIEW WRAPPER START -->
+    <div id="pmoView">
     <!-- Recalibration panel: only appears when a revised deadline is set -->
     <div class="recal hidden" id="recalPanel">
       <h2>🔄 Recalibration — Deadline Moved</h2>
@@ -161,6 +186,7 @@
       </div>
     </div>
     <div class="hint" id="fileInfo"></div>
+    </div><!-- /pmoView -->
   </div>
 </div>
 <script>
@@ -280,12 +306,70 @@ function fmtDate(val){
   const s=String(val).trim();const d=new Date(s);return isNaN(d)? s : d.toISOString().slice(0,10);
 }
 
+/* ================= VIEW TOGGLE ================= */
+function applyViewMode(){
+  const mode=document.getElementById('viewMode').value;
+  const steer=mode==='steer';
+  document.getElementById('steerView').classList.toggle('hidden',!steer);
+  document.getElementById('pmoView').classList.toggle('hidden',steer);
+  if(steer) renderSteering();
+}
+function renderSteering(){
+  const total=rows.length;
+  const done=rows.filter(r=>isDone(r.status)).length;
+  const remaining=total-done;
+  const pct=total?Math.round(done/total*100):0;
+  const overdue=rows.filter(r=>!isDone(r.status)&&r.end&&parseLocal(r.end)<parseLocal(today())).length;
+
+  const pace=actualPace();
+  const effStr=effectiveFinalDeadline();
+  const finalDeadline=parseLocal(effStr);
+  const asOfDay=parseLocal(today());
+  let forecastText="—", forecastDate=null;
+  if(remaining===0){forecastText="✅ Complete";}
+  else if(pace<=0){forecastText="⛔ Stalled";}
+  else{
+    const finishDays=Math.max(1,Math.round(remaining/pace));
+    forecastDate=new Date(asOfDay);let added=0;
+    while(added<finishDays){if(forecastDate.getDay()!==0&&forecastDate.getDay()!==6)added++;if(added>=finishDays)break;forecastDate.setDate(forecastDate.getDate()+1);}
+    forecastText=fmtISO(forecastDate);
+  }
+
+  document.getElementById('svPct').textContent=pct+'%';
+  document.getElementById('svDone').textContent=`${done} of ${total} scenarios`;
+  document.getElementById('svRemaining').textContent=remaining;
+  document.getElementById('svOverdue').textContent=overdue;
+  document.getElementById('svForecast').textContent=forecastText;
+  document.getElementById('svDeadline').textContent=(revisedDeadline()?'vs revised ':'vs ')+effStr;
+
+  const c=statusCounts();
+  const order=["Not Started","In Progress","Ready for Retest","Blocked","Defect","Cancelled","Passed"];
+  const track=document.getElementById('svProgressTrack');track.innerHTML='';
+  order.forEach(s=>{if(c[s]){const d=document.createElement('div');d.style.width=(c[s]/total*100)+'%';d.style.background=colorFor(s);d.title=`${s}: ${c[s]}`;track.appendChild(d);}});
+  document.getElementById('svLegend').innerHTML=order.filter(s=>c[s]).map(s=>`<span><i class="dot" style="background:${colorFor(s)}"></i>${s} (${c[s]})</span>`).join('');
+  document.getElementById('svCompletionPct').textContent=pct+'%';
+
+  const banner=document.getElementById('svBanner');
+  const summary=document.getElementById('svSummary');
+  const daysPast=daysBetween(finalDeadline,asOfDay);
+  const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;
+  const green=()=>{banner.style.background="#14532d";banner.style.color="#bbf7d0";};
+  const red=()=>{banner.style.background="#7f1d1d";banner.style.color="#fecaca";};
+  const amber=()=>{banner.style.background="#78350f";banner.style.color="#fed7aa";};
+
+  if(remaining===0){green();banner.textContent="🎉 TESTING COMPLETE";summary.textContent=`All ${total} scenarios done.`;}
+  else if(daysPast>0){red();banner.textContent="🚨 BEHIND — DEADLINE PASSED";summary.textContent=`${done} of ${total} done (${pct}%). Deadline ${effStr} passed ${daysPast}d ago; ${remaining} still open. Forecast finish ${forecastText}${lateDays>0?` (~${lateDays}d late)`:''}.`;}
+  else if(lateDays!==null && lateDays>0){amber();banner.textContent="⚠️ AT RISK — TRENDING LATE";summary.textContent=`${done} of ${total} done (${pct}%). At current pace, forecast finish ${forecastText} — ~${lateDays}d past the ${effStr} deadline.`;}
+  else{green();banner.textContent="✅ ON TRACK";summary.textContent=`${done} of ${total} done (${pct}%). At current pace, forecast finish ${forecastText}, on/ahead of the ${effStr} deadline.`;}
+}
+
 /* ================= RENDER ================= */
 function renderAll(){
   try{
     renderCards();renderProgress();renderDeadlines();renderBurnRate();renderRecalibration();
     renderBars('testerBars','tester');renderBars('moduleBars','module');
     renderFilters();renderTable();
+    applyViewMode();
   }catch(err){
     console.error("Dashboard render error:",err);
     const s=document.getElementById('burnRateStatus');
@@ -376,10 +460,8 @@ function renderRecalibration(){
   const orig=originalFinalDeadline();
   const remaining=rows.filter(r=>!isDone(r.status)).length;
   const wdRevised=workingDaysUntil(revised)||0;
-  const daysLeft=daysBetween(parseLocal(today()),parseLocal(revised));
   const origPast=daysBetween(parseLocal(orig),parseLocal(today()));
 
-  // 🎯 Recalibration Rate = remaining ÷ business days left to revised deadline
   let recalRate;
   if(remaining===0) recalRate=0;
   else if(wdRevised<=0) recalRate=null;
@@ -511,7 +593,8 @@ window.exportRemaining=()=>{
 document.getElementById('asOfDate').addEventListener('change',()=>{if(rows.length)renderAll();});
 document.getElementById('revisedDeadline').addEventListener('change',()=>{if(rows.length)renderAll();});
 document.getElementById('clearRevised').addEventListener('click',()=>{document.getElementById('revisedDeadline').value='';if(rows.length)renderAll();});
+document.getElementById('viewMode').addEventListener('change',()=>{if(rows.length)applyViewMode();});
 document.querySelectorAll('th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();}));
 </script>
 </body>
-</html> 
+</html>
