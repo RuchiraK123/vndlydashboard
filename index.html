@@ -59,7 +59,14 @@
   .asof{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:18px;flex-wrap:wrap;}
   .asof label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
   .asof input{background:#0b1120;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;}
-  .asof .note{font-size:12px;color:var(--muted);}
+  .asof .note{font-size:12px;color:var(--muted);flex-basis:100%;}
+  .recal{border:1px solid var(--accent);background:linear-gradient(180deg,#0b2536,#0b1120);border-radius:12px;padding:16px 18px;margin-bottom:22px;}
+  .recal h2{margin:0 0 6px;font-size:15px;color:var(--accent);}
+  .recal .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px;}
+  .recal .box{background:#0b1120;border-radius:10px;padding:12px;}
+  .recal .box .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;}
+  .recal .box .big{font-size:24px;font-weight:700;margin-top:4px;}
+  .recal .box .sub{font-size:11px;color:var(--muted);margin-top:2px;}
 </style>
 </head>
 <body>
@@ -78,8 +85,25 @@
     <div class="asof">
       <label for="asOfDate">📅 Evaluate as of:</label>
       <input type="date" id="asOfDate">
-      <span class="note">Auto-read from the file's name (e.g. <b>073026</b> → Jul 30, 2026). If the name has no date, type it here manually. You can always override.</span>
+      <label for="revisedDeadline" style="margin-left:10px;">🔄 Revised deadline:</label>
+      <input type="date" id="revisedDeadline">
+      <button class="btn-ghost" id="clearRevised" style="padding:6px 10px;">Clear</button>
+      <span class="note">Evaluation date auto-reads from the filename (e.g. <b>073026</b> → Jul 30, 2026). <b>Revised deadline is optional</b> — set it only if the original deadline was pushed to a new target. Leave blank to use the original.</span>
     </div>
+
+    <!-- Recalibration panel: only appears when a revised deadline is set -->
+    <div class="recal hidden" id="recalPanel">
+      <h2>🔄 Recalibration — Deadline Moved</h2>
+      <div class="muted" id="recalSummary" style="font-size:13px;"></div>
+      <div class="grid">
+        <div class="box"><div class="lbl">Original Deadline</div><div class="big" id="recalOrig" style="font-size:18px;">—</div><div class="sub" id="recalOrigStatus">—</div></div>
+        <div class="box"><div class="lbl">Revised Deadline</div><div class="big" id="recalNew" style="font-size:18px;">—</div><div class="sub" id="recalDaysLeft">—</div></div>
+        <div class="box"><div class="lbl">Remaining</div><div class="big" id="recalRemaining">0</div><div class="sub">scenarios left</div></div>
+        <div class="box"><div class="lbl">🎯 Recalibration Rate</div><div class="big" id="recalRate" style="color:var(--accent);">0</div><div class="sub">needed/day to hit revised date</div></div>
+        <div class="box"><div class="lbl">Actual Pace</div><div class="big" id="recalActual">0</div><div class="sub" id="recalVerdict">—</div></div>
+      </div>
+    </div>
+
     <div class="cards" id="cards"></div>
     <div class="panels">
       <div class="panel">
@@ -107,9 +131,9 @@
       <div style="height:12px;background:#0b1120;border-radius:20px;overflow:hidden;margin-bottom:12px;"><div id="burnRateBar" style="height:100%;width:0%;background:linear-gradient(90deg,#22c55e,#38bdf8);"></div></div>
       <div id="burnRateStatus" style="padding:12px;border-radius:10px;background:#14532d;color:#bbf7d0;font-size:13px;font-weight:600;">✅ Waiting for data...</div>
       <div class="hint" style="line-height:1.6;">
-        <b>Actual Burn Rate</b> = Completed ÷ elapsed <b>business days</b> (Mon–Fri, weekends excluded), rounded to a whole number.<br>
-        <b>Required Rate</b> = Remaining ÷ business days left (includes today &amp; the deadline day) — recalculates as the date changes.<br>
-        <b>Forecast Finish</b> = "Evaluate as of" date + (Remaining ÷ Actual Burn Rate) <b>business days</b>, skipping weekends.
+        <b>Actual Burn Rate</b> = Completed ÷ elapsed <b>business days</b> (Mon–Fri, weekends excluded), rounded.<br>
+        <b>Required Rate</b> = Remaining ÷ business days left until the <b>effective deadline</b> (revised if set, else original).<br>
+        <b>Forecast Finish</b> = Evaluation date + (Remaining ÷ Actual Burn Rate) <b>business days</b>, skipping weekends.
       </div>
     </div>
     <div class="panels">
@@ -157,8 +181,6 @@ let sortKey=null, sortDir=1;
 
 /* ================= DATE HELPERS ================= */
 function daysBetween(a,b){return Math.round((b-a)/(1000*60*60*24));}
-
-/* parse a date as LOCAL midnight (avoids UTC off-by-one bug) */
 function parseLocal(dateStr){
   if(dateStr instanceof Date) return new Date(dateStr.getFullYear(),dateStr.getMonth(),dateStr.getDate());
   const s=String(dateStr).slice(0,10);
@@ -166,13 +188,18 @@ function parseLocal(dateStr){
   if(p.length===3 && p[0].length===4) return new Date(+p[0],+p[1]-1,+p[2]);
   const d=new Date(s); return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
 }
-
+function fmtISO(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function asOf(){
   const el=document.getElementById('asOfDate');
   if(el && el.value){return parseLocal(el.value);}
   const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate());
 }
 function today(){return asOf();}
+
+/* revised deadline (optional) */
+function revisedDeadline(){const el=document.getElementById('revisedDeadline');return (el && el.value)?el.value:null;}
+function originalFinalDeadline(){return WINDOWS[WINDOWS.length-1].end;}
+function effectiveFinalDeadline(){return revisedDeadline() || originalFinalDeadline();}
 
 /* Business days from as-of date THROUGH target date, INCLUSIVE of both ends. */
 function workingDaysUntil(dateStr){
@@ -256,7 +283,7 @@ function fmtDate(val){
 /* ================= RENDER ================= */
 function renderAll(){
   try{
-    renderCards();renderProgress();renderDeadlines();renderBurnRate();
+    renderCards();renderProgress();renderDeadlines();renderBurnRate();renderRecalibration();
     renderBars('testerBars','tester');renderBars('moduleBars','module');
     renderFilters();renderTable();
   }catch(err){
@@ -275,6 +302,16 @@ function normStatus(s){
   if(t.includes("cancel")) return "Cancelled";
   if(t.includes("block")) return "Blocked";
   return "Not Started";
+}
+function actualPace(){
+  const done=rows.filter(r=>isDone(r.status)).length;
+  const startDates=rows.map(r=>r.start).filter(Boolean).map(d=>parseLocal(d)).filter(d=>d&&!isNaN(d));
+  let projectStart = startDates.length ? new Date(Math.min(...startDates.map(d=>d.getTime()))) : parseLocal(today());
+  const asOfDay=parseLocal(today());
+  let elapsed=0, d=new Date(projectStart);
+  while(d<=asOfDay){const wd=d.getDay();if(wd!==0&&wd!==6)elapsed++;d.setDate(d.getDate()+1);}
+  elapsed=Math.max(1,elapsed);
+  return done/elapsed;
 }
 function renderCards(){
   const total=rows.length;
@@ -303,27 +340,69 @@ function renderProgress(){
 }
 function renderDeadlines(){
   const el=document.getElementById('deadlines');
-  el.innerHTML=WINDOWS.map(w=>{
+  const revised=revisedDeadline();
+  el.innerHTML=WINDOWS.map((w,idx)=>{
+    const isOriginalFinal = idx===WINDOWS.length-1;
     const inWin=rows.filter(r=>r.end && parseLocal(r.end)<=parseLocal(w.end));
     const remaining=inWin.filter(r=>!isDone(r.status)).length;
+    if(isOriginalFinal && revised){
+      return `<div class="deadline-row"><div><b>${w.label}</b><br><span class="muted">Original due ${w.end} — ⚠️ superseded by revised deadline</span></div><div><span class="pill risk">${remaining} left at original date</span></div></div>`;
+    }
     const wd=workingDaysUntil(w.end);
     const daysLeft=daysBetween(parseLocal(today()),parseLocal(w.end));
     let pill, subtext;
-    if(remaining===0){
-      pill=`<span class="pill ok">✅ Done</span>`;
-      subtext=`Due ${w.end} — all scenarios in this window complete`;
-    } else if(daysLeft<0){
-      pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d past deadline • ${remaining} still left</span>`;
-      subtext=`Was due ${w.end} • deadline missed`;
-    } else {
-      const perDay = wd>0 ? Math.ceil(remaining/wd) : remaining;
-      const risk = wd>0 && (remaining/wd)>3;
-      const dayWord = wd===1 ? "1 business day left" : `${wd} business days left`;
-      pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ~${perDay}/day needed</span>`;
-      subtext=`Due ${w.end} • ${dayWord}`;
-    }
+    if(remaining===0){pill=`<span class="pill ok">✅ Done</span>`;subtext=`Due ${w.end} — all scenarios in this window complete`;}
+    else if(daysLeft<0){pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d past deadline • ${remaining} still left</span>`;subtext=`Was due ${w.end} • deadline missed`;}
+    else{const perDay=wd>0?Math.ceil(remaining/wd):remaining;const risk=wd>0&&(remaining/wd)>3;const dayWord=wd===1?"1 business day left":`${wd} business days left`;pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ~${perDay}/day needed</span>`;subtext=`Due ${w.end} • ${dayWord}`;}
     return `<div class="deadline-row"><div><b>${w.label}</b><br><span class="muted">${subtext}</span></div><div>${pill}</div></div>`;
   }).join('');
+  if(revised){
+    const remaining=rows.filter(r=>!isDone(r.status)).length;
+    const wd=workingDaysUntil(revised);
+    const daysLeft=daysBetween(parseLocal(today()),parseLocal(revised));
+    let pill, subtext;
+    if(remaining===0){pill=`<span class="pill ok">✅ Done</span>`;subtext=`Revised due ${revised} — all complete`;}
+    else if(daysLeft<0){pill=`<span class="pill risk">⚠️ ${Math.abs(daysLeft)}d past revised deadline • ${remaining} still left</span>`;subtext=`Revised due ${revised} • also missed`;}
+    else{const perDay=wd>0?Math.ceil(remaining/wd):remaining;const risk=wd>0&&(remaining/wd)>3;const dayWord=wd===1?"1 business day left":`${wd} business days left`;pill=`<span class="pill ${risk?'risk':(daysLeft<=1?'due':'ok')}">${remaining} left • ~${perDay}/day needed</span>`;subtext=`Revised due ${revised} • ${dayWord}`;}
+    el.innerHTML += `<div class="deadline-row" style="border:1px solid #38bdf8;"><div><b>🔄 Revised Testing Deadline</b><br><span class="muted">${subtext}</span></div><div>${pill}</div></div>`;
+  }
+}
+function renderRecalibration(){
+  const panel=document.getElementById('recalPanel');
+  const revised=revisedDeadline();
+  if(!revised){panel.classList.add('hidden');return;}
+  panel.classList.remove('hidden');
+
+  const orig=originalFinalDeadline();
+  const remaining=rows.filter(r=>!isDone(r.status)).length;
+  const wdRevised=workingDaysUntil(revised)||0;
+  const daysLeft=daysBetween(parseLocal(today()),parseLocal(revised));
+  const origPast=daysBetween(parseLocal(orig),parseLocal(today()));
+
+  // 🎯 Recalibration Rate = remaining ÷ business days left to revised deadline
+  let recalRate;
+  if(remaining===0) recalRate=0;
+  else if(wdRevised<=0) recalRate=null;
+  else recalRate=remaining/wdRevised;
+
+  const pace=actualPace();
+
+  document.getElementById('recalSummary').innerHTML =
+    `Original deadline of <b>${orig}</b> ${origPast>0?`passed <b>${origPast} day(s)</b> ago`:`is set`} with <b>${remaining}</b> scenario(s) still open. Deadline moved to <b>${revised}</b>. New pace required below.`;
+  document.getElementById('recalOrig').textContent=orig;
+  document.getElementById('recalOrigStatus').textContent = origPast>0 ? `⚠️ ${origPast}d past` : "not yet reached";
+  document.getElementById('recalOrigStatus').style.color = origPast>0 ? "#f87171" : "#94a3b8";
+  document.getElementById('recalNew').textContent=revised;
+  document.getElementById('recalDaysLeft').textContent = wdRevised>0 ? `${wdRevised} business day(s) left` : "revised date passed";
+  document.getElementById('recalRemaining').textContent=remaining;
+  document.getElementById('recalRate').textContent = remaining===0 ? "0" : (recalRate===null ? "—" : Math.ceil(recalRate));
+  document.getElementById('recalActual').textContent = Math.round(pace);
+
+  const verdict=document.getElementById('recalVerdict');
+  if(remaining===0){verdict.textContent="✅ all done";verdict.style.color="#22c55e";}
+  else if(recalRate===null){verdict.textContent="⚠️ revised date already passed";verdict.style.color="#f87171";}
+  else if(pace>=recalRate){verdict.textContent="✅ on pace for revised date";verdict.style.color="#22c55e";}
+  else{const gap=Math.ceil(recalRate-pace);verdict.textContent=`⚠️ need +${gap}/day faster`;verdict.style.color="#fbbf24";}
 }
 function renderBurnRate(){
   const total=rows.length;
@@ -337,8 +416,9 @@ function renderBurnRate(){
   elapsedDays=Math.max(1,elapsedDays);
   const actualRatePrecise=done/elapsedDays;
   const actualRateWhole=Math.round(actualRatePrecise);
-  const finalDeadline=parseLocal(WINDOWS[WINDOWS.length-1].end);
-  const workingDaysToDeadline=workingDaysUntil(WINDOWS[WINDOWS.length-1].end)||0;
+  const effDeadlineStr=effectiveFinalDeadline();
+  const finalDeadline=parseLocal(effDeadlineStr);
+  const workingDaysToDeadline=workingDaysUntil(effDeadlineStr)||0;
   const daysPastDeadline=daysBetween(finalDeadline,asOfDay);
   let neededRate;
   if(remaining===0){neededRate=0;}
@@ -350,12 +430,8 @@ function renderBurnRate(){
   else{
     const finishDays=Math.max(1,Math.round(remaining/actualRatePrecise));
     forecastDate=new Date(asOfDay);let added=0;
-    while(added<finishDays){
-      if(forecastDate.getDay()!==0 && forecastDate.getDay()!==6) added++;
-      if(added>=finishDays) break;
-      forecastDate.setDate(forecastDate.getDate()+1);
-    }
-    forecastText=`${forecastDate.getFullYear()}-${String(forecastDate.getMonth()+1).padStart(2,'0')}-${String(forecastDate.getDate()).padStart(2,'0')}`;
+    while(added<finishDays){if(forecastDate.getDay()!==0&&forecastDate.getDay()!==6)added++;if(added>=finishDays)break;forecastDate.setDate(forecastDate.getDate()+1);}
+    forecastText=fmtISO(forecastDate);
   }
   document.getElementById('actualBurnRate').textContent=actualRateWhole;
   document.getElementById('neededBurnRate').textContent=remaining===0?"0":(neededRate===null?"—":Math.ceil(neededRate));
@@ -378,14 +454,15 @@ function renderBurnRate(){
   const green=()=>{status.style.background="#14532d";status.style.color="#bbf7d0";};
   const red=()=>{status.style.background="#7f1d1d";status.style.color="#fecaca";};
   const amber=()=>{status.style.background="#78350f";status.style.color="#fed7aa";};
+  const label = revisedDeadline() ? `revised deadline ${effDeadlineStr}` : `deadline ${effDeadlineStr}`;
   if(remaining===0){green();status.innerHTML="🎉 Testing Complete";}
   else if(daysPastDeadline>0){
     red();
-    if(actualRatePrecise<=0){status.innerHTML=`🚨 ${daysPastDeadline}d past deadline (${WINDOWS[WINDOWS.length-1].end}) • ${remaining} left • pace is 0/day`;}
-    else{const lateDays=daysBetween(finalDeadline,forecastDate);status.innerHTML=`🚨 ${daysPastDeadline}d past deadline • ${remaining} left • at ~${actualRateWhole}/day, forecast finish ${forecastText}${lateDays>0?` (~${lateDays} days late)`:''}`;}
+    if(actualRatePrecise<=0){status.innerHTML=`🚨 ${daysPastDeadline}d past ${label} • ${remaining} left • pace is 0/day`;}
+    else{const lateDays=daysBetween(finalDeadline,forecastDate);status.innerHTML=`🚨 ${daysPastDeadline}d past ${label} • ${remaining} left • at ~${actualRateWhole}/day, forecast finish ${forecastText}${lateDays>0?` (~${lateDays} days late)`:''}`;}
   }
-  else if(actualRatePrecise>=neededRate){green();status.innerHTML=`✅ On Track • ~${actualRateWhole}/day ≥ Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}`;}
-  else{amber();const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;const lateNote=(lateDays!==null&&lateDays>0)?` (~${lateDays} days late)`:"";status.innerHTML=`⚠️ Behind Pace • ~${actualRateWhole}/day < Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}${lateNote}`;}
+  else if(actualRatePrecise>=neededRate){green();status.innerHTML=`✅ On Track for ${label} • ~${actualRateWhole}/day ≥ Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}`;}
+  else{amber();const lateDays=forecastDate?daysBetween(finalDeadline,forecastDate):null;const lateNote=(lateDays!==null&&lateDays>0)?` (~${lateDays} days late)`:"";status.innerHTML=`⚠️ Behind Pace for ${label} • ~${actualRateWhole}/day < Needed ${Math.ceil(neededRate)}/day • forecast finish ${forecastText}${lateNote}`;}
 }
 function renderBars(elId,key){
   const grp={};
@@ -432,6 +509,8 @@ window.exportRemaining=()=>{
 };
 ['search','filterTester','filterModule','filterStatus','onlyOpen'].forEach(id=>document.getElementById(id).addEventListener('input',renderTable));
 document.getElementById('asOfDate').addEventListener('change',()=>{if(rows.length)renderAll();});
+document.getElementById('revisedDeadline').addEventListener('change',()=>{if(rows.length)renderAll();});
+document.getElementById('clearRevised').addEventListener('click',()=>{document.getElementById('revisedDeadline').value='';if(rows.length)renderAll();});
 document.querySelectorAll('th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();}));
 </script>
 </body>
