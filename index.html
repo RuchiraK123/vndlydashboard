@@ -5,13 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VNDLY Testing Burndown Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{--bg:#0f172a;--card:#1e293b;--card2:#273449;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--border:#334155;}
   *{box-sizing:border-box;}
   body{margin:0;font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);}
-  header{padding:20px 28px;background:linear-gradient(90deg,#0ea5e9,#6366f1);color:#fff;}
+  header{padding:20px 28px;background:linear-gradient(90deg,#0ea5e9,#6366f1);color:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
   header h1{margin:0;font-size:22px;}
   header p{margin:4px 0 0;opacity:.9;font-size:13px;}
+  .capture-btn{background:#fff;color:#0ea5e9;border:none;border-radius:8px;padding:10px 16px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .capture-btn:hover{background:#e0f2fe;}
   .wrap{padding:20px 28px;}
   .drop{border:2px dashed var(--accent);border-radius:14px;padding:26px;text-align:center;background:var(--card);cursor:pointer;transition:.2s;margin-bottom:22px;}
   .drop.hover{background:#0b1120;border-color:#22c55e;}
@@ -67,12 +70,17 @@
   .recal .box .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;}
   .recal .box .big{font-size:24px;font-weight:700;margin-top:4px;}
   .recal .box .sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .toast{position:fixed;bottom:24px;right:24px;background:#14532d;color:#bbf7d0;padding:14px 20px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:9999;opacity:0;transition:.3s;pointer-events:none;}
+  .toast.show{opacity:1;}
 </style>
 </head>
 <body>
 <header>
-  <h1>🧪 VNDLY Testing Burndown & Deadline Dashboard</h1>
-  <p>Drop in your daily tracker download → instantly see what's left and whether you're on pace to finish on time.</p>
+  <div>
+    <h1>🧪 VNDLY Testing Burndown & Deadline Dashboard</h1>
+    <p>Drop in your daily tracker download → instantly see what's left and whether you're on pace to finish on time.</p>
+  </div>
+  <button class="capture-btn hidden" id="captureBtn" onclick="captureDashboard()">📸 Capture Dashboard</button>
 </header>
 <div class="wrap">
   <div class="drop" id="drop">
@@ -96,6 +104,9 @@
       <span class="note">Evaluation date auto-reads from the filename (e.g. <b>073026</b> → Jul 30, 2026). <b>Revised deadline is optional</b> — set it only if the original deadline was pushed to a new target. Leave blank to use the original.</span>
     </div>
 
+    <!-- Everything below is captured in the screenshot -->
+    <div id="captureArea">
+
     <!-- STEERING COMMITTEE VIEW -->
     <div id="steerView" class="hidden">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:22px;">
@@ -111,7 +122,26 @@
         <div style="margin-top:14px;font-size:15px;">Completion: <b id="svCompletionPct">0%</b></div>
       </div>
       <div id="svBanner" style="padding:22px;border-radius:14px;background:#14532d;color:#bbf7d0;font-size:18px;font-weight:700;text-align:center;">Waiting for data…</div>
-      <div id="svSummary" class="hint" style="text-align:center;font-size:14px;margin-top:12px;"></div>
+      <div id="svSummary" class="hint" style="text-align:center;font-size:14px;margin-top:12px;margin-bottom:22px;"></div>
+      <div class="panel">
+        <h2>🚧 What's Left To Do</h2>
+        <div class="toolbar">
+          <input type="text" id="svSearch" placeholder="🔍 Search...">
+          <select id="svFilterTester"><option value="">All Testers</option></select>
+          <select id="svFilterModule"><option value="">All Modules</option></select>
+          <select id="svFilterStatus"><option value="">All Statuses</option></select>
+          <label style="font-size:13px" class="muted"><input type="checkbox" id="svOnlyOpen"> Show only unfinished</label>
+        </div>
+        <div class="table-wrap">
+          <table id="svTbl">
+            <thead><tr>
+              <th data-k="id">ID</th><th data-k="module">Module</th><th data-k="scenario">Scenario</th>
+              <th data-k="tester">Tester</th><th data-k="end">Due</th><th data-k="status">Status</th><th data-k="pace">Timing</th>
+            </tr></thead>
+            <tbody id="svTbody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- PMO VIEW WRAPPER START -->
@@ -187,8 +217,10 @@
     </div>
     <div class="hint" id="fileInfo"></div>
     </div><!-- /pmoView -->
+    </div><!-- /captureArea -->
   </div>
 </div>
+<div class="toast" id="toast"></div>
 <script>
 /* ================= CONFIG ================= */
 const DONE_STATUSES = ["passed","closed","complete","completed","pass"];
@@ -274,6 +306,7 @@ function handleFile(f){
     if(!parsed||!parsed.length){alert("Couldn't find a 'Test ID' column. Make sure this is the tracker download.");return;}
     rows=parsed;
     document.getElementById('dashboard').classList.remove('hidden');
+    document.getElementById('captureBtn').classList.remove('hidden');
     const asOfEl=document.getElementById('asOfDate');
     const detected=parseDateFromFilename(f.name);
     let sourceNote;
@@ -304,6 +337,34 @@ function fmtDate(val){
   if(val===""||val==null) return "";
   if(typeof val==="number"){const d=new Date(Math.round((val-25569)*86400*1000));return d.toISOString().slice(0,10);}
   const s=String(val).trim();const d=new Date(s);return isNaN(d)? s : d.toISOString().slice(0,10);
+}
+
+/* ================= CAPTURE DASHBOARD ================= */
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2600);
+}
+function captureDashboard(){
+  if(!rows.length){showToast('⚠️ Load a tracker first');return;}
+  const area=document.getElementById('captureArea');
+  const btn=document.getElementById('captureBtn');
+  const oldTxt=btn.textContent;btn.textContent='⏳ Capturing…';btn.disabled=true;
+  html2canvas(area,{backgroundColor:'#0f172a',scale:2,useCORS:true,windowWidth:area.scrollWidth}).then(canvas=>{
+    canvas.toBlob(blob=>{
+      const mode=document.getElementById('viewMode').value==='steer'?'Steering':'PMO';
+      const stamp=(document.getElementById('asOfDate').value||new Date().toISOString().slice(0,10));
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`VNDLY_${mode}_Dashboard_${stamp}.png`;
+      a.click();
+      btn.textContent=oldTxt;btn.disabled=false;
+      showToast('📸 Saved! Drag the PNG into your Teams chat.');
+    });
+  }).catch(err=>{
+    console.error(err);btn.textContent=oldTxt;btn.disabled=false;
+    showToast('⛔ Capture failed — see console (F12)');
+  });
 }
 
 /* ================= VIEW TOGGLE ================= */
@@ -361,6 +422,9 @@ function renderSteering(){
   else if(daysPast>0){red();banner.textContent="🚨 BEHIND — DEADLINE PASSED";summary.textContent=`${done} of ${total} done (${pct}%). Deadline ${effStr} passed ${daysPast}d ago; ${remaining} still open. Forecast finish ${forecastText}${lateDays>0?` (~${lateDays}d late)`:''}.`;}
   else if(lateDays!==null && lateDays>0){amber();banner.textContent="⚠️ AT RISK — TRENDING LATE";summary.textContent=`${done} of ${total} done (${pct}%). At current pace, forecast finish ${forecastText} — ~${lateDays}d past the ${effStr} deadline.`;}
   else{green();banner.textContent="✅ ON TRACK";summary.textContent=`${done} of ${total} done (${pct}%). At current pace, forecast finish ${forecastText}, on/ahead of the ${effStr} deadline.`;}
+
+  renderSteerFilters();
+  renderSteerTable();
 }
 
 /* ================= RENDER ================= */
@@ -553,6 +617,8 @@ function renderBars(elId,key){
   const max=Math.max(1,...entries.map(e=>e.total));
   document.getElementById(elId).innerHTML=entries.length?entries.map(e=>`<div class="row"><div class="lbl" title="${e.k}">${e.k}</div><div class="track"><div class="seg" style="width:${e.done/max*100}%;background:#22c55e" title="Done: ${e.done}"></div><div class="seg" style="width:${e.rem/max*100}%;background:#f59e0b" title="Remaining: ${e.rem}"></div></div><div class="val">${e.rem} left</div></div>`).join(''):`<div class="muted">🎉 Nothing remaining here.</div>`;
 }
+
+/* ---- PMO table filters/render ---- */
 function renderFilters(){fillSel('filterTester',uniq('tester'));fillSel('filterModule',uniq('module'));fillSel('filterStatus',[...new Set(rows.map(r=>normStatus(r.status)))].sort());}
 function uniq(k){return [...new Set(rows.map(r=>r[k]).filter(Boolean))].sort();}
 function fillSel(id,vals){const el=document.getElementById(id),cur=el.value,first=el.querySelector('option');el.innerHTML='';el.appendChild(first);vals.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);});el.value=cur;}
@@ -566,6 +632,30 @@ function currentRows(){
   if(sortKey){list=[...list].sort((a,b)=>(''+(a[sortKey]||'')).localeCompare(''+(b[sortKey]||''))*sortDir);}
   return list;
 }
+function renderTable(){
+  const tb=document.getElementById('tbody');
+  tb.innerHTML=currentRows().map(r=>{const s=normStatus(r.status);return `<tr><td>${esc(r.id)}</td><td>${esc(r.module)}</td><td>${esc(r.scenario)}</td><td>${esc(r.tester)}</td><td>${esc(r.end)||'<span class="muted">—</span>'}</td><td><span class="badge" style="background:${colorFor(s)}">${s}</span></td><td>${paceTag(r)}</td></tr>`;}).join('')||`<tr><td colspan="7" class="muted" style="padding:18px">🎉 Nothing matches — all clear!</td></tr>`;
+}
+
+/* ---- Steering table filters/render ---- */
+function renderSteerFilters(){
+  fillSel('svFilterTester',uniq('tester'));fillSel('svFilterModule',uniq('module'));fillSel('svFilterStatus',[...new Set(rows.map(r=>normStatus(r.status)))].sort());
+}
+function currentSteerRows(){
+  const q=document.getElementById('svSearch').value.toLowerCase();
+  const ft=document.getElementById('svFilterTester').value;
+  const fm=document.getElementById('svFilterModule').value;
+  const fs=document.getElementById('svFilterStatus').value;
+  const openOnly=document.getElementById('svOnlyOpen').checked;
+  let list=rows.filter(r=>{const hay=(r.id+r.module+r.scenario+r.tester+r.status).toLowerCase();return (!q||hay.includes(q))&&(!ft||r.tester===ft)&&(!fm||r.module===fm)&&(!fs||normStatus(r.status)===fs)&&(!openOnly||!isDone(r.status));});
+  if(sortKey){list=[...list].sort((a,b)=>(''+(a[sortKey]||'')).localeCompare(''+(b[sortKey]||''))*sortDir);}
+  return list;
+}
+function renderSteerTable(){
+  const tb=document.getElementById('svTbody');
+  tb.innerHTML=currentSteerRows().map(r=>{const s=normStatus(r.status);return `<tr><td>${esc(r.id)}</td><td>${esc(r.module)}</td><td>${esc(r.scenario)}</td><td>${esc(r.tester)}</td><td>${esc(r.end)||'<span class="muted">—</span>'}</td><td><span class="badge" style="background:${colorFor(s)}">${s}</span></td><td>${paceTag(r)}</td></tr>`;}).join('')||`<tr><td colspan="7" class="muted" style="padding:18px">🎉 Nothing matches — all clear!</td></tr>`;
+}
+
 function paceTag(r){
   if(isDone(r.status)) return `<span class="pill ok">Done</span>`;
   if(!r.end) return `<span class="muted">—</span>`;
@@ -574,10 +664,6 @@ function paceTag(r){
   if(dl===0) return `<span class="pill due">Due today</span>`;
   if(dl<=1) return `<span class="pill due">Due tomorrow</span>`;
   return `<span class="pill ok">${dl}d left</span>`;
-}
-function renderTable(){
-  const tb=document.getElementById('tbody');
-  tb.innerHTML=currentRows().map(r=>{const s=normStatus(r.status);return `<tr><td>${esc(r.id)}</td><td>${esc(r.module)}</td><td>${esc(r.scenario)}</td><td>${esc(r.tester)}</td><td>${esc(r.end)||'<span class="muted">—</span>'}</td><td><span class="badge" style="background:${colorFor(s)}">${s}</span></td><td>${paceTag(r)}</td></tr>`;}).join('')||`<tr><td colspan="7" class="muted" style="padding:18px">🎉 Nothing matches — all clear!</td></tr>`;
 }
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 window.exportRemaining=()=>{
@@ -590,11 +676,12 @@ window.exportRemaining=()=>{
   a.download='VNDLY_Whats_Left_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 };
 ['search','filterTester','filterModule','filterStatus','onlyOpen'].forEach(id=>document.getElementById(id).addEventListener('input',renderTable));
+['svSearch','svFilterTester','svFilterModule','svFilterStatus','svOnlyOpen'].forEach(id=>document.getElementById(id).addEventListener('input',renderSteerTable));
 document.getElementById('asOfDate').addEventListener('change',()=>{if(rows.length)renderAll();});
 document.getElementById('revisedDeadline').addEventListener('change',()=>{if(rows.length)renderAll();});
 document.getElementById('clearRevised').addEventListener('click',()=>{document.getElementById('revisedDeadline').value='';if(rows.length)renderAll();});
 document.getElementById('viewMode').addEventListener('change',()=>{if(rows.length)applyViewMode();});
-document.querySelectorAll('th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();}));
+document.querySelectorAll('th[data-k]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}renderTable();renderSteerTable();}));
 </script>
 </body>
 </html>
